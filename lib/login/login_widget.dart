@@ -164,7 +164,7 @@ class _LoginWidgetState extends State<LoginWidget> {
                                     padding: EdgeInsetsDirectional.fromSTEB(
                                         0.0, 0.0, 0.0, 12.0),
                                     child: Text(
-                                      'Preencha as informações para acessar sua conta.',
+                                      'Preencha as informações para acessar sua conta!',
                                       textAlign: TextAlign.start,
                                       style: FlutterFlowTheme.of(context)
                                           .bodyMedium

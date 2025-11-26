@@ -214,15 +214,17 @@ class ThemeTypography extends Typography {
   final FlutterFlowTheme theme;
 
   String get displayLargeFamily => 'Poppins';
-  bool get displayLargeIsCustom => false;
-  TextStyle get displayLarge => GoogleFonts.poppins(
+  bool get displayLargeIsCustom => true;
+  TextStyle get displayLarge => TextStyle(
+        fontFamily: 'Poppins',
         color: theme.primaryText,
         fontWeight: FontWeight.w600,
         fontSize: 64.0,
       );
   String get displayMediumFamily => 'Poppins';
-  bool get displayMediumIsCustom => false;
-  TextStyle get displayMedium => GoogleFonts.poppins(
+  bool get displayMediumIsCustom => true;
+  TextStyle get displayMedium => TextStyle(
+        fontFamily: 'Poppins',
         color: theme.primaryText,
         fontWeight: FontWeight.w600,
         fontSize: 44.0,
