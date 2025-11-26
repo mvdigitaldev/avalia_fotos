@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
-import 'flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/flutter_flow_util.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'flutter_flow/nav/nav.dart';
+import '/flutter_flow/nav/nav.dart';
+import '/services/supabase_service.dart';
 import 'index.dart';
 
 void main() async {
@@ -15,6 +16,14 @@ void main() async {
   usePathUrlStrategy();
 
   await FlutterFlowTheme.initialize();
+  
+  // Inicializar Supabase
+  try {
+    await SupabaseService.getInstance();
+  } catch (e) {
+    print('Erro ao inicializar Supabase: $e');
+    // Continuar mesmo se houver erro (para desenvolvimento)
+  }
 
   runApp(MyApp());
 }

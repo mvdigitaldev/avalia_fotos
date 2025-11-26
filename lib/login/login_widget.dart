@@ -5,6 +5,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import '/flutter_flow/nav/nav.dart';
+import '../services/supabase_service.dart';
+import '../services/auth_service.dart';
 import 'login_model.dart';
 export 'login_model.dart';
 
@@ -22,6 +26,8 @@ class _LoginWidgetState extends State<LoginWidget> {
   late LoginModel _model;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
+  late AuthService _authService;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -33,6 +39,61 @@ class _LoginWidgetState extends State<LoginWidget> {
 
     _model.textController2 ??= TextEditingController();
     _model.textFieldFocusNode2 ??= FocusNode();
+
+    // Inicializar AuthService
+    _initializeServices();
+  }
+
+  Future<void> _initializeServices() async {
+    final supabaseService = await SupabaseService.getInstance();
+    _authService = AuthService(supabaseService);
+  }
+
+  Future<void> _handleLogin() async {
+    if (_model.textController1?.text.isEmpty ?? true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor, insira seu email')),
+      );
+      return;
+    }
+
+    if (_model.textController2?.text.isEmpty ?? true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor, insira sua senha')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await _authService.signInWithEmail(
+        email: _model.textController1!.text.trim(),
+        password: _model.textController2!.text,
+      );
+
+      if (mounted) {
+        // O router vai redirecionar automaticamente devido ao redirect
+        context.go('/');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao fazer login: ${e.toString()}'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -530,10 +591,10 @@ class _LoginWidgetState extends State<LoginWidget> {
                                     padding: EdgeInsetsDirectional.fromSTEB(
                                         0.0, 16.0, 0.0, 0.0),
                                     child: FFButtonWidget(
-                                      onPressed: () {
-                                        print('Button pressed ...');
+                                      onPressed: _isLoading ? null : () async {
+                                        await _handleLogin();
                                       },
-                                      text: 'Entrar!',
+                                      text: _isLoading ? 'Entrando...' : 'Entrar!',
                                       options: FFButtonOptions(
                                         width: double.infinity,
                                         height: 50.0,

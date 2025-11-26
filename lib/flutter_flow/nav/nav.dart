@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:page_transition/page_transition.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '/main.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -11,6 +12,7 @@ import '/flutter_flow/lat_lng.dart';
 import '/flutter_flow/place.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'serialization_util.dart';
+import '/services/supabase_service.dart';
 
 import '/index.dart';
 
@@ -22,72 +24,121 @@ const kTransitionInfoKey = '__transition_info__';
 GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 class AppStateNotifier extends ChangeNotifier {
-  AppStateNotifier._();
+  AppStateNotifier._() {
+    // Escutar mudanças de autenticação
+    _initializeAuthListener();
+  }
 
   static AppStateNotifier? _instance;
   static AppStateNotifier get instance => _instance ??= AppStateNotifier._();
 
   bool showSplashImage = true;
+  StreamSubscription<AuthState>? _authSubscription;
+
+  void _initializeAuthListener() {
+    // Inicializar listener de autenticação de forma assíncrona
+    SupabaseService.getInstance().then((service) {
+      _authSubscription = service.authStateChanges.listen((authState) {
+        // Notificar listeners quando o estado de autenticação mudar
+        notifyListeners();
+      });
+    }).catchError((e) {
+      print('Erro ao inicializar listener de autenticação: $e');
+    });
+  }
 
   void stopShowingSplashImage() {
     showSplashImage = false;
     notifyListeners();
   }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
 }
 
-GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
-      initialLocation: '/',
-      debugLogDiagnostics: true,
-      refreshListenable: appStateNotifier,
-      navigatorKey: appNavigatorKey,
-      errorBuilder: (context, state) => NavBarPage(),
-      routes: [
-        FFRoute(
-          name: '_initialize',
-          path: '/',
-          builder: (context, _) => NavBarPage(),
-        ),
-        FFRoute(
-          name: FeedWidget.routeName,
-          path: FeedWidget.routePath,
-          builder: (context, params) =>
-              params.isEmpty ? NavBarPage(initialPage: 'feed') : FeedWidget(),
-        ),
-        FFRoute(
-          name: PainelWidget.routeName,
-          path: PainelWidget.routePath,
-          builder: (context, params) => params.isEmpty
-              ? NavBarPage(initialPage: 'painel')
-              : PainelWidget(),
-        ),
-        FFRoute(
-          name: AvaliaWidget.routeName,
-          path: AvaliaWidget.routePath,
-          builder: (context, params) => params.isEmpty
-              ? NavBarPage(initialPage: 'avalia')
-              : AvaliaWidget(),
-        ),
-        FFRoute(
-          name: HistoricoWidget.routeName,
-          path: HistoricoWidget.routePath,
-          builder: (context, params) => params.isEmpty
-              ? NavBarPage(initialPage: 'historico')
-              : HistoricoWidget(),
-        ),
-        FFRoute(
-          name: RankingWidget.routeName,
-          path: RankingWidget.routePath,
-          builder: (context, params) => params.isEmpty
-              ? NavBarPage(initialPage: 'ranking')
-              : RankingWidget(),
-        ),
-        FFRoute(
-          name: LoginWidget.routeName,
-          path: LoginWidget.routePath,
-          builder: (context, params) => LoginWidget(),
-        )
-      ].map((r) => r.toRoute(appStateNotifier)).toList(),
-    );
+GoRouter createRouter(AppStateNotifier appStateNotifier) {
+  return GoRouter(
+    initialLocation: '/',
+    debugLogDiagnostics: true,
+    refreshListenable: appStateNotifier,
+    navigatorKey: appNavigatorKey,
+    redirect: (context, state) {
+      // Verificar se o usuário está autenticado
+      final isAuthenticated = SupabaseService.isAuthenticated;
+      final isLoginPage = state.uri.path == LoginWidget.routePath;
+      
+      // Se não está autenticado e não está na página de login, redirecionar para login
+      if (!isAuthenticated && !isLoginPage) {
+        return LoginWidget.routePath;
+      }
+      
+      // Se está autenticado e está na página de login, redirecionar para home
+      if (isAuthenticated && isLoginPage) {
+        return '/';
+      }
+      
+      // Permitir acesso
+      return null;
+    },
+    errorBuilder: (context, state) => NavBarPage(),
+    routes: [
+      FFRoute(
+        name: '_initialize',
+        path: '/',
+        requireAuth: true,
+        builder: (context, _) => NavBarPage(),
+      ),
+      FFRoute(
+        name: FeedWidget.routeName,
+        path: FeedWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) =>
+            params.isEmpty ? NavBarPage(initialPage: 'feed') : FeedWidget(),
+      ),
+      FFRoute(
+        name: PainelWidget.routeName,
+        path: PainelWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => params.isEmpty
+            ? NavBarPage(initialPage: 'painel')
+            : PainelWidget(),
+      ),
+      FFRoute(
+        name: AvaliaWidget.routeName,
+        path: AvaliaWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => params.isEmpty
+            ? NavBarPage(initialPage: 'avalia')
+            : AvaliaWidget(),
+      ),
+      FFRoute(
+        name: HistoricoWidget.routeName,
+        path: HistoricoWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => params.isEmpty
+            ? NavBarPage(initialPage: 'historico')
+            : HistoricoWidget(),
+      ),
+      FFRoute(
+        name: RankingWidget.routeName,
+        path: RankingWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => params.isEmpty
+            ? NavBarPage(initialPage: 'ranking')
+            : RankingWidget(),
+      ),
+      FFRoute(
+        name: LoginWidget.routeName,
+        path: LoginWidget.routePath,
+        requireAuth: false,
+        builder: (context, params) => LoginWidget(),
+      )
+    ].map((r) => r.toRoute(appStateNotifier)).toList(),
+  );
+}
 
 extension NavParamExtensions on Map<String, String?> {
   Map<String, String> get withoutNulls => Map.fromEntries(
@@ -197,6 +248,14 @@ class FFRoute {
   GoRoute toRoute(AppStateNotifier appStateNotifier) => GoRoute(
         name: name,
         path: path,
+        redirect: requireAuth ? (context, state) {
+          // Verificar autenticação para rotas protegidas
+          final isAuthenticated = SupabaseService.isAuthenticated;
+          if (!isAuthenticated) {
+            return LoginWidget.routePath;
+          }
+          return null;
+        } : null,
         pageBuilder: (context, state) {
           fixStatusBarOniOS16AndBelow(context);
           final ffParams = FFParameters(state, asyncParams);

@@ -1,0 +1,248 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'supabase_service.dart';
+import '../models/photo_model.dart';
+
+class PhotoService {
+  final SupabaseService _supabaseService;
+
+  PhotoService(this._supabaseService);
+
+  SupabaseClient get _client => _supabaseService.client;
+
+  String? get currentUserId => _supabaseService.currentUser?.id;
+
+  Future<List<PhotoModel>> getFeedPhotos({
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    try {
+      // Buscar fotos compartilhadas com informações do usuário
+      final response = await _client
+          .from('photos')
+          .select('''
+            *,
+            users:user_id (
+              username,
+              avatar_url
+            )
+          ''')
+          .eq('is_shared', true)
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      final photos = <PhotoModel>[];
+
+      for (final item in response) {
+        try {
+          final userData = item['users'] as Map<String, dynamic>?;
+          final photo = PhotoModel.fromJson(item);
+          
+          // Verificar se o usuário atual curtiu esta foto
+          bool? isLiked;
+          if (currentUserId != null) {
+            try {
+              final likeResponse = await _client
+                  .from('likes')
+                  .select('id')
+                  .eq('photo_id', photo.id)
+                  .eq('user_id', currentUserId!)
+                  .maybeSingle();
+              isLiked = likeResponse != null;
+            } catch (e) {
+              // Se houver erro ao verificar like, continua sem o status
+              print('Erro ao verificar like: $e');
+            }
+          }
+
+          photos.add(photo.copyWith(
+            username: userData?['username'] as String?,
+            userAvatarUrl: userData?['avatar_url'] as String?,
+            isLiked: isLiked,
+          ));
+        } catch (e) {
+          print('Erro ao processar foto: $e');
+          // Continua processando outras fotos mesmo se uma falhar
+        }
+      }
+
+      return photos;
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<List<PhotoModel>> getUserPhotos({
+    required String userId,
+    int limit = 20,
+    int offset = 0,
+    bool? isShared,
+  }) async {
+    try {
+      var query = _client
+          .from('photos')
+          .select('''
+            *,
+            users:user_id (
+              username,
+              avatar_url
+            )
+          ''')
+          .eq('user_id', userId);
+
+      if (isShared != null) {
+        query = query.eq('is_shared', isShared);
+      }
+
+      final response = await query
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      final photos = <PhotoModel>[];
+      for (final item in response) {
+        final userData = item['users'] as Map<String, dynamic>?;
+        photos.add(PhotoModel.fromJson(item).copyWith(
+          username: userData?['username'] as String?,
+          userAvatarUrl: userData?['avatar_url'] as String?,
+        ));
+      }
+      return photos;
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<PhotoModel> getPhotoById(String photoId) async {
+    try {
+      final response = await _client
+          .from('photos')
+          .select('''
+            *,
+            users:user_id (
+              username,
+              avatar_url
+            )
+          ''')
+          .eq('id', photoId)
+          .single();
+
+      final userData = response['users'] as Map<String, dynamic>?;
+      return PhotoModel.fromJson(response).copyWith(
+        username: userData?['username'] as String?,
+        userAvatarUrl: userData?['avatar_url'] as String?,
+      );
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<void> toggleLike(String photoId) async {
+    try {
+      if (currentUserId == null) {
+        throw Exception('Usuário não autenticado');
+      }
+
+      // Verificar se já curtiu
+      final existingLike = await _client
+          .from('likes')
+          .select('id')
+          .eq('photo_id', photoId)
+          .eq('user_id', currentUserId!)
+          .maybeSingle();
+
+      if (existingLike != null) {
+        // Remover like
+        await _client.from('likes').delete().eq('id', existingLike['id']);
+        await _client.rpc('decrement_likes_count', params: {'p_photo_id': photoId});
+      } else {
+        // Adicionar like
+        await _client.from('likes').insert({
+          'photo_id': photoId,
+          'user_id': currentUserId!,
+        });
+        await _client.rpc('increment_likes_count', params: {'p_photo_id': photoId});
+      }
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<void> addComment({
+    required String photoId,
+    required String content,
+  }) async {
+    try {
+      if (currentUserId == null) {
+        throw Exception('Usuário não autenticado');
+      }
+
+      await _client.from('comments').insert({
+        'photo_id': photoId,
+        'user_id': currentUserId!,
+        'content': content,
+      });
+
+      await _client.rpc('increment_comments_count', params: {'p_photo_id': photoId});
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getComments(String photoId) async {
+    try {
+      final response = await _client
+          .from('comments')
+          .select('''
+            *,
+            users:user_id (
+              username,
+              avatar_url
+            )
+          ''')
+          .eq('photo_id', photoId)
+          .order('created_at', ascending: false);
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<void> deleteComment(String commentId, String photoId) async {
+    try {
+      if (currentUserId == null) {
+        throw Exception('Usuário não autenticado');
+      }
+
+      await _client.from('comments').delete().eq('id', commentId);
+
+      await _client.rpc('decrement_comments_count', params: {'p_photo_id': photoId});
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<void> updatePhotoShareStatus({
+    required String photoId,
+    required bool isShared,
+  }) async {
+    try {
+      await _client
+          .from('photos')
+          .update({'is_shared': isShared})
+          .eq('id', photoId);
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Exception _handleError(dynamic error) {
+    if (error is PostgrestException) {
+      return Exception(error.message);
+    } else if (error is Exception) {
+      return error;
+    } else {
+      return Exception('Erro desconhecido: $error');
+    }
+  }
+}
+
