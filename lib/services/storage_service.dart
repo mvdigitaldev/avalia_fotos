@@ -95,5 +95,49 @@ class StorageService {
       throw Exception('Erro ao deletar foto: $e');
     }
   }
+
+  Future<List<String>> deleteMultiplePhotos(List<String> imageUrls) async {
+    final deletedUrls = <String>[];
+    final filePaths = <String>[];
+
+    // Extrair todos os caminhos de arquivo
+    for (final imageUrl in imageUrls) {
+      try {
+        final uri = Uri.parse(imageUrl);
+        final pathSegments = uri.pathSegments;
+        final bucketIndex = pathSegments.indexOf('photos');
+        if (bucketIndex != -1 && bucketIndex < pathSegments.length - 1) {
+          final filePath = pathSegments.sublist(bucketIndex + 1).join('/');
+          filePaths.add(filePath);
+        }
+      } catch (e) {
+        print('Erro ao processar URL $imageUrl: $e');
+      }
+    }
+
+    if (filePaths.isEmpty) return deletedUrls;
+
+    try {
+      // Deletar todos os arquivos de uma vez
+      await _client.storage.from('photos').remove(filePaths);
+      deletedUrls.addAll(imageUrls);
+    } catch (e) {
+      // Se falhar em lote, tentar individualmente
+      if (e is StorageException) {
+        for (int i = 0; i < imageUrls.length; i++) {
+          try {
+            await deletePhoto(imageUrls[i]);
+            deletedUrls.add(imageUrls[i]);
+          } catch (individualError) {
+            print('Erro ao deletar foto individual ${imageUrls[i]}: $individualError');
+          }
+        }
+      } else {
+        throw Exception('Erro ao deletar múltiplas fotos: $e');
+      }
+    }
+
+    return deletedUrls;
+  }
 }
 

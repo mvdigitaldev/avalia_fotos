@@ -135,6 +135,12 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) {
         path: LoginWidget.routePath,
         requireAuth: false,
         builder: (context, params) => LoginWidget(),
+      ),
+      FFRoute(
+        name: PhotoDetailWidget.routeName,
+        path: PhotoDetailWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => PhotoDetailWidget(),
       )
     ].map((r) => r.toRoute(appStateNotifier)).toList(),
   );

@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
+import 'storage_service.dart';
 import '../models/photo_model.dart';
 
 class PhotoService {
@@ -230,6 +231,79 @@ class PhotoService {
           .from('photos')
           .update({'is_shared': isShared})
           .eq('id', photoId);
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<int> getUserPhotosCount({bool? isShared}) async {
+    try {
+      if (currentUserId == null) return 0;
+
+      // Buscar todas as fotos sem limit para contar
+      var query = _client
+          .from('photos')
+          .select('id')
+          .eq('user_id', currentUserId!);
+
+      if (isShared != null) {
+        query = query.eq('is_shared', isShared);
+      }
+
+      final response = await query;
+      return response.length;
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<List<String>> deletePhotos(List<String> photoIds) async {
+    try {
+      if (currentUserId == null) {
+        throw Exception('Usuário não autenticado');
+      }
+
+      // Buscar URLs das imagens antes de deletar
+      final photosResponse = await _client
+          .from('photos')
+          .select('id, image_url')
+          .inFilter('id', photoIds)
+          .eq('user_id', currentUserId!); // Garantir que só deleta fotos do usuário atual
+
+      final imageUrls = <String>[];
+      final validPhotoIds = <String>[];
+
+      for (final photo in photosResponse) {
+        final photoId = photo['id'] as String;
+        final imageUrl = photo['image_url'] as String?;
+        if (imageUrl != null && imageUrl.isNotEmpty) {
+          imageUrls.add(imageUrl);
+          validPhotoIds.add(photoId);
+        }
+      }
+
+      if (validPhotoIds.isEmpty) {
+        return [];
+      }
+
+      // Deletar do Storage primeiro
+      final storageService = StorageService(_supabaseService);
+      final deletedUrls = await storageService.deleteMultiplePhotos(imageUrls);
+
+      // Mapear URLs deletadas para IDs
+      final deletedPhotoIds = <String>[];
+      for (int i = 0; i < imageUrls.length; i++) {
+        if (deletedUrls.contains(imageUrls[i])) {
+          deletedPhotoIds.add(validPhotoIds[i]);
+        }
+      }
+
+      // Deletar do banco de dados apenas as que foram deletadas do Storage
+      if (deletedPhotoIds.isNotEmpty) {
+        await _client.from('photos').delete().inFilter('id', deletedPhotoIds);
+      }
+
+      return deletedPhotoIds;
     } catch (e) {
       throw _handleError(e);
     }

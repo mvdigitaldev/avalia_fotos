@@ -13,6 +13,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:go_router/go_router.dart';
 import '../../services/supabase_service.dart';
 import '../../services/photo_service.dart';
 import '../../services/auth_service.dart';
@@ -475,7 +476,12 @@ class _FeedWidgetState extends State<FeedWidget> {
               ],
             ),
           ),
-          _buildImageWidget(photo),
+          GestureDetector(
+            onTap: () {
+              context.push('/photo-detail/${photo.id}');
+            },
+            child: _buildImageWidget(photo),
+          ),
           Padding(
             padding: EdgeInsetsDirectional.fromSTEB(20.0, 12.0, 20.0, 12.0),
             child: Row(
