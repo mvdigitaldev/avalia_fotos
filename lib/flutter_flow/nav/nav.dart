@@ -16,6 +16,19 @@ import '/services/supabase_service.dart';
 
 import '/index.dart';
 
+// Import PlansWidget explicitly
+import '/pages/plans/plans_widget.dart';
+// Import PerfilWidget explicitly
+import '/pages/perfil/perfil_widget.dart';
+// Import TutorialSuporteWidget explicitly
+import '/pages/tutorial_suporte/tutorial_suporte_widget.dart';
+// Import SignupWidget explicitly
+import '/signup/signup_widget.dart';
+// Import ConquistasWidget explicitly
+import '/pages/conquistas/conquistas_widget.dart';
+// Import InspirarWidget explicitly
+import '/pages/inspirar/inspirar_widget.dart';
+
 export 'package:go_router/go_router.dart';
 export 'serialization_util.dart';
 
@@ -65,24 +78,26 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) {
     debugLogDiagnostics: true,
     refreshListenable: appStateNotifier,
     navigatorKey: appNavigatorKey,
-    redirect: (context, state) {
-      // Verificar se o usuário está autenticado
-      final isAuthenticated = SupabaseService.isAuthenticated;
-      final isLoginPage = state.uri.path == LoginWidget.routePath;
-      
-      // Se não está autenticado e não está na página de login, redirecionar para login
-      if (!isAuthenticated && !isLoginPage) {
-        return LoginWidget.routePath;
-      }
-      
-      // Se está autenticado e está na página de login, redirecionar para home
-      if (isAuthenticated && isLoginPage) {
-        return '/';
-      }
-      
-      // Permitir acesso
-      return null;
-    },
+      redirect: (context, state) {
+        // Verificar se o usuário está autenticado
+        final isAuthenticated = SupabaseService.isAuthenticated;
+        final isLoginPage = state.uri.path == LoginWidget.routePath;
+        final isSignupPage = state.uri.path == SignupWidget.routePath;
+        final isAuthPage = isLoginPage || isSignupPage;
+        
+        // Se não está autenticado e não está em página de autenticação, redirecionar para login
+        if (!isAuthenticated && !isAuthPage) {
+          return LoginWidget.routePath;
+        }
+        
+        // Se está autenticado e está em página de autenticação, redirecionar para home
+        if (isAuthenticated && isAuthPage) {
+          return '/';
+        }
+        
+        // Permitir acesso
+        return null;
+      },
     errorBuilder: (context, state) => NavBarPage(),
     routes: [
       FFRoute(
@@ -130,17 +145,53 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) {
             ? NavBarPage(initialPage: 'ranking')
             : RankingWidget(),
       ),
-      FFRoute(
-        name: LoginWidget.routeName,
-        path: LoginWidget.routePath,
-        requireAuth: false,
-        builder: (context, params) => LoginWidget(),
-      ),
+        FFRoute(
+          name: LoginWidget.routeName,
+          path: LoginWidget.routePath,
+          requireAuth: false,
+          builder: (context, params) => LoginWidget(),
+        ),
+        FFRoute(
+          name: SignupWidget.routeName,
+          path: SignupWidget.routePath,
+          requireAuth: false,
+          builder: (context, params) => SignupWidget(),
+        ),
       FFRoute(
         name: PhotoDetailWidget.routeName,
         path: PhotoDetailWidget.routePath,
         requireAuth: true,
         builder: (context, params) => PhotoDetailWidget(),
+      ),
+      FFRoute(
+        name: PlansWidget.routeName,
+        path: PlansWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => PlansWidget(),
+      ),
+      FFRoute(
+        name: PerfilWidget.routeName,
+        path: PerfilWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => PerfilWidget(),
+      ),
+      FFRoute(
+        name: TutorialSuporteWidget.routeName,
+        path: TutorialSuporteWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => TutorialSuporteWidget(),
+      ),
+      FFRoute(
+        name: ConquistasWidget.routeName,
+        path: ConquistasWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => ConquistasWidget(),
+      ),
+      FFRoute(
+        name: InspirarWidget.routeName,
+        path: InspirarWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => InspirarWidget(),
       )
     ].map((r) => r.toRoute(appStateNotifier)).toList(),
   );

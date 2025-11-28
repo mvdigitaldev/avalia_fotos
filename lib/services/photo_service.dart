@@ -257,6 +257,25 @@ class PhotoService {
     }
   }
 
+  Future<int> getUserStorageCount() async {
+    try {
+      if (currentUserId == null) return 0;
+
+      // Buscar todas as fotos do usuário e contar
+      final response = await _client
+          .from('photos')
+          .select('id')
+          .eq('user_id', currentUserId!);
+
+      // Converter para lista e contar
+      final photosList = response as List;
+      return photosList.length;
+    } catch (e) {
+      print('Erro ao contar fotos armazenadas: $e');
+      throw _handleError(e);
+    }
+  }
+
   Future<List<String>> deletePhotos(List<String> photoIds) async {
     try {
       if (currentUserId == null) {
@@ -304,6 +323,116 @@ class PhotoService {
       }
 
       return deletedPhotoIds;
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<List<PhotoModel>> getFilteredSharedPhotos({
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    double? minScore,
+    String? categoria,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    try {
+      // Construir query base sempre filtrando por is_shared = true
+      var query = _client
+          .from('photos')
+          .select('''
+            *,
+            users:user_id (
+              username,
+              avatar_url
+            )
+          ''')
+          .eq('is_shared', true);
+
+      // Aplicar filtros dinamicamente
+      if (dateFrom != null) {
+        query = query.gte('created_at', dateFrom.toIso8601String());
+      }
+
+      if (dateTo != null) {
+        // Adicionar 1 dia para incluir o dia inteiro
+        final dateToEnd = DateTime(dateTo.year, dateTo.month, dateTo.day, 23, 59, 59);
+        query = query.lte('created_at', dateToEnd.toIso8601String());
+      }
+
+      if (minScore != null) {
+        query = query.gte('score', minScore);
+      }
+
+      if (categoria != null && categoria.isNotEmpty) {
+        query = query.eq('categoria', categoria);
+      }
+
+      // Ordenar por data de criação (mais recentes primeiro) e aplicar paginação
+      final response = await query
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      final photos = <PhotoModel>[];
+      for (final item in response) {
+        try {
+          final userData = item['users'] as Map<String, dynamic>?;
+          final photo = PhotoModel.fromJson(item);
+          
+          // Verificar se o usuário atual curtiu esta foto
+          bool? isLiked;
+          if (currentUserId != null) {
+            try {
+              final likeResponse = await _client
+                  .from('likes')
+                  .select('id')
+                  .eq('photo_id', photo.id)
+                  .eq('user_id', currentUserId!)
+                  .maybeSingle();
+              isLiked = likeResponse != null;
+            } catch (e) {
+              // Se houver erro ao verificar like, continua sem o status
+              print('Erro ao verificar like: $e');
+            }
+          }
+
+          photos.add(photo.copyWith(
+            username: userData?['username'] as String?,
+            userAvatarUrl: userData?['avatar_url'] as String?,
+            isLiked: isLiked,
+          ));
+        } catch (e) {
+          print('Erro ao processar foto: $e');
+          // Continua processando outras fotos mesmo se uma falhar
+        }
+      }
+
+      return photos;
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<List<String>> getAvailableCategories() async {
+    try {
+      // Buscar categorias distintas de fotos compartilhadas
+      final response = await _client
+          .from('photos')
+          .select('categoria')
+          .eq('is_shared', true)
+          .not('categoria', 'is', null);
+
+      // Extrair categorias únicas e ordenar alfabeticamente
+      final categoriesSet = <String>{};
+      for (final item in response) {
+        final categoria = item['categoria'] as String?;
+        if (categoria != null && categoria.isNotEmpty) {
+          categoriesSet.add(categoria);
+        }
+      }
+
+      final categoriesList = categoriesSet.toList()..sort();
+      return categoriesList;
     } catch (e) {
       throw _handleError(e);
     }

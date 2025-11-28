@@ -4,14 +4,21 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 import '../models/evaluation_result_model.dart';
 import '../models/photo_model.dart';
+import '../models/achievement_model.dart';
 import 'photo_service.dart';
+import 'plan_service.dart';
+import 'achievement_service.dart';
 
 class AIEvaluationService {
   final SupabaseService _supabaseService;
   final PhotoService _photoService;
+  final PlanService _planService;
+  final AchievementService _achievementService;
 
   AIEvaluationService(this._supabaseService)
-      : _photoService = PhotoService(_supabaseService);
+      : _photoService = PhotoService(_supabaseService),
+        _planService = PlanService(_supabaseService),
+        _achievementService = AchievementService(_supabaseService);
 
   SupabaseClient get _client => _supabaseService.client;
   String? get currentUserId => _supabaseService.currentUser?.id;
@@ -24,6 +31,12 @@ class AIEvaluationService {
     try {
       if (currentUserId == null) {
         throw Exception('Usuário não autenticado');
+      }
+
+      // Verificar limites antes de avaliar
+      final limitCheck = await _planService.canEvaluatePhoto(currentUserId!);
+      if (!limitCheck.canEvaluate) {
+        throw Exception(limitCheck.reason ?? 'Limite atingido');
       }
 
       // Converter imagem para base64
@@ -53,10 +66,18 @@ class AIEvaluationService {
       
       // A Edge Function já salva a foto no banco e retorna o objeto photo completo
       final photoData = responseData['photo'] as Map<String, dynamic>;
+      final photo = PhotoModel.fromJson(photoData);
       
-      // O objeto photo já vem do banco com todos os campos corretos
-      // Apenas garantir que os campos estão no formato correto
-      return PhotoModel.fromJson(photoData);
+      // Incrementar contador de avaliações mensais após sucesso
+      await _planService.incrementMonthlyEvaluation(currentUserId!);
+      
+      // Atualizar pontuação mensal do usuário
+      await _updateMonthlyScore(photo.score);
+      
+      // Nota: A verificação de conquistas será feita na UI após a avaliação
+      // para permitir que o modal seja exibido corretamente
+      
+      return photo;
     } catch (e) {
       if (e is Exception) {
         throw e;
@@ -73,37 +94,47 @@ class AIEvaluationService {
       // Calcular pontuação a adicionar: (score/2) + 2
       final scoreToAdd = (photoScore / 2) + 2;
 
-      // Obter mês atual
+      // Obter mês e ano atual como inteiros
       final now = DateTime.now();
-      final month = DateTime(now.year, now.month, 1);
+      final month = now.month;
+      final year = now.year;
 
-      // Verificar se já existe registro para este mês
+      // Verificar se já existe registro para este mês/ano
       final existing = await _client
           .from('user_monthly_scores')
-          .select('id, score')
+          .select('id, score, photos_count')
           .eq('user_id', currentUserId!)
-          .eq('month', month.toIso8601String())
+          .eq('month', month)
+          .eq('year', year)
           .maybeSingle();
 
       if (existing != null) {
-        // Atualizar pontuação existente
+        // Atualizar pontuação existente e incrementar contador de fotos
+        final currentScore = (existing['score'] as num).toDouble();
+        final currentPhotosCount = (existing['photos_count'] as num?)?.toInt() ?? 0;
+        
         await _client
             .from('user_monthly_scores')
             .update({
-              'score': (existing['score'] as num).toDouble() + scoreToAdd,
+              'score': currentScore + scoreToAdd,
+              'photos_count': currentPhotosCount + 1,
             })
             .eq('id', existing['id']);
       } else {
-        // Criar novo registro
+        // Criar novo registro para o mês/ano atual
+        // Quando o mês muda, um novo registro é criado automaticamente (score começa do zero)
         await _client.from('user_monthly_scores').insert({
           'user_id': currentUserId!,
-          'month': month.toIso8601String(),
+          'month': month,
+          'year': year,
           'score': scoreToAdd,
+          'photos_count': 1,
         });
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Não falhar a avaliação se houver erro ao atualizar score
       print('Erro ao atualizar pontuação mensal: $e');
+      print('Stack trace: $stackTrace');
     }
   }
 }

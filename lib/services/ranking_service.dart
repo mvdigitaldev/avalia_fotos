@@ -13,11 +13,24 @@ class RankingService {
   Future<List<RankingItemModel>> getTopUsersOfMonth({
     int limit = 10,
   }) async {
-    try {
-      final now = DateTime.now();
-      final currentMonth = now.month;
-      final currentYear = now.year;
+    final now = DateTime.now();
+    return getTopUsersOfMonthPaginated(
+      limit: limit,
+      offset: 0,
+      month: now.month,
+      year: now.year,
+    );
+  }
 
+  Future<List<RankingItemModel>> getTopUsersOfMonthPaginated({
+    required int limit,
+    required int offset,
+    required int month,
+    required int year,
+  }) async {
+    try {
+      print('Buscando ranking: month=$month, year=$year, limit=$limit, offset=$offset');
+      
       final response = await _client
           .from('user_monthly_scores')
           .select('''
@@ -29,25 +42,86 @@ class RankingService {
               avatar_url
             )
           ''')
-          .eq('month', currentMonth)
-          .eq('year', currentYear)
+          .eq('month', month)
+          .eq('year', year)
           .order('score', ascending: false)
-          .limit(limit);
+          .range(offset, offset + limit - 1);
 
-      return response.asMap().entries.map((entry) {
-        final index = entry.key;
-        final item = entry.value;
-        final userData = item['users'] as Map<String, dynamic>?;
-        
-        return RankingItemModel(
-          userId: item['user_id'] as String,
-          username: userData?['username'] as String?,
-          avatarUrl: userData?['avatar_url'] as String?,
-          score: (item['score'] ?? 0).toDouble(),
-          photosCount: item['photos_count'] ?? 0,
-          position: index + 1,
-        );
-      }).toList();
+      print('Resposta recebida: ${response.length} itens');
+      
+      final users = <RankingItemModel>[];
+      for (var i = 0; i < response.length; i++) {
+        try {
+          final item = response[i];
+          
+          // Processar userData - pode vir como Map ou List dependendo do formato
+          final userData = item['users'];
+          Map<String, dynamic>? userMap;
+          
+          if (userData != null) {
+            if (userData is List && userData.isNotEmpty) {
+              userMap = userData[0] as Map<String, dynamic>?;
+            } else if (userData is Map<String, dynamic>) {
+              userMap = userData;
+            }
+          }
+          
+          // Processar score - pode vir como String ou num
+          final score = item['score'];
+          double scoreValue = 0.0;
+          if (score is String) {
+            scoreValue = double.tryParse(score) ?? 0.0;
+          } else if (score is num) {
+            scoreValue = score.toDouble();
+          }
+          
+          // Processar photos_count
+          final photosCount = item['photos_count'];
+          int photosCountValue = 0;
+          if (photosCount is int) {
+            photosCountValue = photosCount;
+          } else if (photosCount is num) {
+            photosCountValue = photosCount.toInt();
+          }
+          
+          final userId = item['user_id'] as String;
+          
+          users.add(RankingItemModel(
+            userId: userId,
+            username: userMap?['username'] as String?,
+            avatarUrl: userMap?['avatar_url'] as String?,
+            score: scoreValue,
+            photosCount: photosCountValue,
+            position: offset + i + 1,
+          ));
+        } catch (e, stackTrace) {
+          print('Erro ao processar item $i do ranking: $e');
+          print('Stack trace: $stackTrace');
+          // Continuar processando outros itens mesmo se um falhar
+        }
+      }
+      
+      print('Total de usuários processados: ${users.length}');
+      return users;
+    } catch (e, stackTrace) {
+      print('Erro no getTopUsersOfMonthPaginated: $e');
+      print('Stack trace: $stackTrace');
+      throw _handleError(e);
+    }
+  }
+
+  Future<int> getTotalUsersCount({
+    required int month,
+    required int year,
+  }) async {
+    try {
+      final response = await _client
+          .from('user_monthly_scores')
+          .select('id')
+          .eq('month', month)
+          .eq('year', year);
+
+      return (response as List).length;
     } catch (e) {
       throw _handleError(e);
     }
@@ -56,10 +130,24 @@ class RankingService {
   Future<List<PhotoModel>> getBestPhotosOfMonth({
     int limit = 10,
   }) async {
+    final now = DateTime.now();
+    return getBestPhotosOfMonthPaginated(
+      limit: limit,
+      offset: 0,
+      month: now.month,
+      year: now.year,
+    );
+  }
+
+  Future<List<PhotoModel>> getBestPhotosOfMonthPaginated({
+    required int limit,
+    required int offset,
+    required int month,
+    required int year,
+  }) async {
     try {
-      final now = DateTime.now();
-      final startOfMonth = DateTime(now.year, now.month, 1);
-      final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+      final startOfMonth = DateTime(year, month, 1);
+      final endOfMonth = DateTime(year, month + 1, 0, 23, 59, 59);
 
       final response = await _client
           .from('photos')
@@ -74,7 +162,7 @@ class RankingService {
           .gte('created_at', startOfMonth.toIso8601String())
           .lte('created_at', endOfMonth.toIso8601String())
           .order('score', ascending: false)
-          .limit(limit);
+          .range(offset, offset + limit - 1);
 
       final photos = <PhotoModel>[];
       for (final item in response) {
@@ -85,6 +173,27 @@ class RankingService {
         ));
       }
       return photos;
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<int> getTotalPhotosCount({
+    required int month,
+    required int year,
+  }) async {
+    try {
+      final startOfMonth = DateTime(year, month, 1);
+      final endOfMonth = DateTime(year, month + 1, 0, 23, 59, 59);
+
+      final response = await _client
+          .from('photos')
+          .select('id')
+          .eq('is_shared', true)
+          .gte('created_at', startOfMonth.toIso8601String())
+          .lte('created_at', endOfMonth.toIso8601String());
+
+      return (response as List).length;
     } catch (e) {
       throw _handleError(e);
     }
@@ -116,6 +225,32 @@ class RankingService {
           .eq('month', currentMonth)
           .eq('year', currentYear)
           .gt('score', score);
+
+      final position = countResponse.length + 1;
+      return position;
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<int?> getUserOverallRankingPosition(String userId) async {
+    try {
+      // Buscar total_score do usuário
+      final userData = await _client
+          .from('users')
+          .select('total_score')
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (userData == null) return null;
+
+      final totalScore = (userData['total_score'] ?? 0).toDouble();
+
+      // Contar quantos usuários têm total_score maior
+      final countResponse = await _client
+          .from('users')
+          .select('id')
+          .gt('total_score', totalScore);
 
       final position = countResponse.length + 1;
       return position;

@@ -534,138 +534,234 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
   }
 
   Widget _buildEvaluationCard() {
+    final score = _model.photo!.score;
+    final primaryColor = FlutterFlowTheme.of(context).primary;
+    
     return Container(
       margin: const EdgeInsetsDirectional.fromSTEB(20, 20, 20, 0),
-      padding: const EdgeInsetsDirectional.fromSTEB(24, 24, 24, 24),
+      padding: const EdgeInsetsDirectional.fromSTEB(0, 0, 0, 0),
       decoration: BoxDecoration(
-        color: FlutterFlowTheme.of(context).secondaryBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: FlutterFlowTheme.of(context).primary.withOpacity(0.2),
-          width: 1,
-        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withOpacity(0.15),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+            spreadRadius: 0,
+          ),
+        ],
       ),
-      child: Column(
-        children: [
-          // Nota em círculo
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: FlutterFlowTheme.of(context).primary,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _model.photo!.score.toStringAsFixed(2),
-                    style: FlutterFlowTheme.of(context).displayMedium.override(
-                          font: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
-                          ),
-                          color: Colors.white,
-                          letterSpacing: 0.0,
-                        ),
-                  ),
-                  Text(
-                    '/ 10',
-                    style: FlutterFlowTheme.of(context).bodyMedium.override(
-                          font: GoogleFonts.poppins(),
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: 14.0,
-                          letterSpacing: 0.0,
-                        ),
-                  ),
-                ],
-              ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                primaryColor,
+                primaryColor.withOpacity(0.9),
+                primaryColor.withOpacity(0.85),
+              ],
             ),
           ),
-          // Recado
-          if (_model.photo!.recado != null && _model.photo!.recado!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(0, 16, 0, 0),
-              child: Container(
-                padding: const EdgeInsetsDirectional.fromSTEB(16, 8, 16, 8),
-                decoration: BoxDecoration(
-                  color: FlutterFlowTheme.of(context).primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  _model.photo!.recado!,
-                  style: FlutterFlowTheme.of(context).titleMedium.override(
-                        font: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600,
-                        ),
-                        color: FlutterFlowTheme.of(context).primary,
-                        letterSpacing: 0.0,
-                      ),
-                ),
-              ),
-            ),
-          // Observação
-          if (_model.photo!.observacao != null &&
-              _model.photo!.observacao!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(0, 20, 0, 0),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsetsDirectional.fromSTEB(16, 16, 16, 16),
-                decoration: BoxDecoration(
-                  color: FlutterFlowTheme.of(context).primaryBackground,
-                  borderRadius: BorderRadius.circular(12),
-                ),
+          child: Column(
+            children: [
+              // Seção da nota com design moderno
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(24, 32, 24, 24),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Observação:',
-                      style: FlutterFlowTheme.of(context).titleSmall.override(
-                            font: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w600,
-                            ),
-                            letterSpacing: 0.0,
+                    // Nota em destaque
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          score.toStringAsFixed(2),
+                          style: GoogleFonts.poppins(
+                            fontSize: 64,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            height: 1.0,
+                            letterSpacing: -2,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsetsDirectional.fromSTEB(0, 8, 0, 0),
-                      child: Text(
-                        _model.photo!.observacao!,
-                        style: FlutterFlowTheme.of(context).bodyMedium.override(
-                              font: GoogleFonts.poppins(),
-                              letterSpacing: 0.0,
+                        ),
+                        Padding(
+                          padding: const EdgeInsetsDirectional.fromSTEB(8, 0, 0, 12),
+                          child: Text(
+                            '/ 10',
+                            style: GoogleFonts.poppins(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withOpacity(0.9),
+                              height: 1.0,
                             ),
-                      ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-            ),
-          // Categoria
-          if (_model.photo!.categoria != null &&
-              _model.photo!.categoria!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(0, 16, 0, 0),
-              child: Container(
-                padding: const EdgeInsetsDirectional.fromSTEB(12, 6, 12, 6),
+              // Conteúdo do card com fundo branco/claro
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsetsDirectional.fromSTEB(24, 24, 24, 24),
                 decoration: BoxDecoration(
-                  color: FlutterFlowTheme.of(context).success.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(16),
+                  color: FlutterFlowTheme.of(context).secondaryBackground,
                 ),
-                child: Text(
-                  _model.photo!.categoria!,
-                  style: FlutterFlowTheme.of(context).bodySmall.override(
-                        font: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600,
+                child: Column(
+                  children: [
+                    // Recado com design moderno
+                    if (_model.photo!.recado != null && _model.photo!.recado!.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsetsDirectional.fromSTEB(20, 14, 20, 14),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              primaryColor.withOpacity(0.12),
+                              primaryColor.withOpacity(0.06),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: primaryColor.withOpacity(0.2),
+                            width: 1.5,
+                          ),
                         ),
-                        color: FlutterFlowTheme.of(context).success,
-                        letterSpacing: 0.0,
+                        child: Text(
+                          _model.photo!.recado!,
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: primaryColor,
+                            letterSpacing: 0.0,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
+                    // Observação com design moderno
+                    if (_model.photo!.observacao != null &&
+                        _model.photo!.observacao!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsetsDirectional.fromSTEB(0, 20, 0, 0),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsetsDirectional.fromSTEB(20, 20, 20, 20),
+                          decoration: BoxDecoration(
+                            color: FlutterFlowTheme.of(context).primaryBackground,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: FlutterFlowTheme.of(context).alternate.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.lightbulb_outline,
+                                    color: primaryColor,
+                                    size: 20,
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsetsDirectional.fromSTEB(8, 0, 0, 0),
+                                    child: Text(
+                                      'Observação:',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: FlutterFlowTheme.of(context).primaryText,
+                                        letterSpacing: 0.0,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Padding(
+                                padding: const EdgeInsetsDirectional.fromSTEB(0, 12, 0, 0),
+                                child: Text(
+                                  _model.photo!.observacao!,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 15,
+                                    height: 1.5,
+                                    color: FlutterFlowTheme.of(context).primaryText,
+                                    letterSpacing: 0.0,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    // Categoria com design moderno
+                    if (_model.photo!.categoria != null &&
+                        _model.photo!.categoria!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsetsDirectional.fromSTEB(0, 20, 0, 0),
+                        child: Container(
+                          padding: const EdgeInsetsDirectional.fromSTEB(16, 10, 16, 10),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                FlutterFlowTheme.of(context).success.withOpacity(0.15),
+                                FlutterFlowTheme.of(context).success.withOpacity(0.08),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: FlutterFlowTheme.of(context).success.withOpacity(0.3),
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: FlutterFlowTheme.of(context).success.withOpacity(0.1),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.category_outlined,
+                                size: 16,
+                                color: FlutterFlowTheme.of(context).success,
+                              ),
+                              Padding(
+                                padding: const EdgeInsetsDirectional.fromSTEB(6, 0, 0, 0),
+                                child: Text(
+                                  _model.photo!.categoria!,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: FlutterFlowTheme.of(context).success,
+                                    letterSpacing: 0.0,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-            ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }

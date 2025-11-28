@@ -21,6 +21,14 @@ class AvaliaModel extends FlutterFlowModel<AvaliaWidget> {
   bool isLoading = false;
   PhotoModel? evaluatedPhoto;
   String? errorMessage;
+  
+  // Estado de limites
+  bool canEvaluate = true;
+  String? limitMessage;
+  int? monthlyEvaluationsUsed;
+  int? monthlyEvaluationsLimit;
+  int storageUsed = 0;
+  int? storageLimit;
 
   @override
   void initState(BuildContext context) {

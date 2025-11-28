@@ -39,6 +39,29 @@ class AuthService {
     String? username,
   }) async {
     try {
+      // Se username foi fornecido, validar formato e unicidade
+      if (username != null && username.isNotEmpty) {
+        // Validar formato do username
+        final usernameRegex = RegExp(r'^[a-zA-Z][a-zA-Z0-9_-]{2,16}$');
+        if (!usernameRegex.hasMatch(username)) {
+          throw Exception(
+            'Username inválido. Deve começar com letra e ter entre 3-17 caracteres (letras, números, _ ou -)',
+          );
+        }
+
+        // Verificar se username já existe (case-insensitive)
+        final existing = await _client
+            .from('users')
+            .select('id')
+            .ilike('username', username)
+            .limit(1);
+
+        if (existing.isNotEmpty) {
+          throw Exception('Este username já está em uso');
+        }
+      }
+
+      // Criar usuário no Auth primeiro
       final response = await _client.auth.signUp(
         email: email,
         password: password,
@@ -49,8 +72,107 @@ class AuthService {
         throw Exception('Falha ao criar conta');
       }
 
-      // O trigger cria o registro em users automaticamente
-      return await getCurrentUserProfile();
+      final userId = response.user!.id;
+      final finalUsername = username ?? 'user_${userId.substring(0, 8)}';
+
+      // Aguardar um pouco para o trigger processar (se existir)
+      await Future.delayed(const Duration(milliseconds: 1500));
+
+      // Verificar se o registro foi criado pelo trigger
+      UserModel? userProfile;
+      try {
+        userProfile = await getCurrentUserProfile();
+        if (userProfile != null) {
+          return userProfile;
+        }
+      } catch (e) {
+        print('Trigger não criou o registro ou ainda não está disponível: $e');
+      }
+
+      // Se o trigger não funcionou, criar manualmente usando RPC
+      try {
+        // Buscar o plano Free primeiro
+        final freePlanResponse = await _client
+            .from('plans')
+            .select('id')
+            .eq('name', 'Free')
+            .single();
+
+        final freePlanId = freePlanResponse['id'] as String;
+
+        // Chamar função RPC para criar o perfil
+        try {
+          final rpcResponse = await _client.rpc('create_user_profile', params: {
+            'p_user_id': userId,
+            'p_email': email,
+            'p_username': finalUsername,
+            'p_free_plan_id': freePlanId,
+          });
+
+          // Verificar resposta do RPC
+          if (rpcResponse is Map<String, dynamic>) {
+            final success = rpcResponse['success'] as bool? ?? false;
+            if (!success) {
+              final error = rpcResponse['error'] as String? ?? 'Erro desconhecido';
+              print('RPC retornou erro: $error');
+              throw Exception('Erro ao criar perfil: $error');
+            }
+          }
+        } catch (rpcError) {
+          print('Erro ao chamar RPC: $rpcError');
+          // Continuar para tentar inserção direta
+          rethrow;
+        }
+
+        // Aguardar um pouco para garantir que foi criado
+        await Future.delayed(const Duration(milliseconds: 1000));
+
+        // Tentar buscar o perfil novamente
+        userProfile = await getCurrentUserProfile();
+        
+        if (userProfile != null) {
+          return userProfile;
+        }
+
+        // Se ainda não encontrou, tentar inserção direta como último recurso
+        try {
+          await _client.from('users').insert({
+            'id': userId,
+            'email': email,
+            'username': finalUsername,
+            'created_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          });
+
+          await Future.delayed(const Duration(milliseconds: 500));
+
+          await _client.from('user_plans').insert({
+            'user_id': userId,
+            'plan_id': freePlanId,
+            'is_active': true,
+            'started_at': DateTime.now().toIso8601String(),
+            'created_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          });
+
+          await Future.delayed(const Duration(milliseconds: 500));
+          userProfile = await getCurrentUserProfile();
+          
+          if (userProfile != null) {
+            return userProfile;
+          }
+        } catch (insertError) {
+          print('Erro ao inserir diretamente: $insertError');
+        }
+
+        // Se chegou aqui, nenhum método funcionou
+        // Mas o usuário foi criado no Auth, então pedir para fazer login
+        throw Exception('Conta criada no sistema de autenticação, mas houve um erro ao criar o perfil. Por favor, faça login novamente.');
+      } catch (e) {
+        print('Erro geral ao criar perfil: $e');
+        // Se o usuário foi criado no Auth mas não no banco, pedir para fazer login
+        throw Exception('Conta criada, mas houve um erro ao criar o perfil. Por favor, faça login novamente - seu perfil será criado automaticamente.');
+      }
     } catch (e) {
       throw _handleError(e);
     }
@@ -92,7 +214,29 @@ class AuthService {
       }
 
       final updates = <String, dynamic>{};
-      if (username != null) updates['username'] = username;
+      if (username != null) {
+        // Validar formato do username
+        final usernameRegex = RegExp(r'^[a-zA-Z][a-zA-Z0-9_-]{2,16}$');
+        if (!usernameRegex.hasMatch(username)) {
+          throw Exception(
+            'Username inválido. Deve começar com letra e ter entre 3-17 caracteres (letras, números, _ ou -)',
+          );
+        }
+
+        // Verificar se username já existe (case-insensitive), excluindo o usuário atual
+        final existing = await _client
+            .from('users')
+            .select('id')
+            .ilike('username', username)
+            .neq('id', user.id)
+            .limit(1);
+
+        if (existing.isNotEmpty) {
+          throw Exception('Este username já está em uso');
+        }
+
+        updates['username'] = username;
+      }
       if (avatarUrl != null) updates['avatar_url'] = avatarUrl;
 
       await _client.from('users').update(updates).eq('id', user.id);

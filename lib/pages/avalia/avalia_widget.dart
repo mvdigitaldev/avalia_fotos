@@ -11,7 +11,13 @@ import 'package:image_picker/image_picker.dart';
 import '../../services/supabase_service.dart';
 import '../../services/storage_service.dart';
 import '../../services/ai_evaluation_service.dart';
+import '../../services/plan_service.dart';
+import '../../services/photo_service.dart';
+import '../../services/achievement_service.dart';
 import '../../models/photo_model.dart';
+import '../../models/achievement_model.dart';
+import '../../components/achievement_unlocked_modal.dart';
+import 'package:go_router/go_router.dart';
 import 'avalia_model.dart';
 export 'avalia_model.dart';
 
@@ -31,6 +37,8 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
   final scaffoldKey = GlobalKey<ScaffoldState>();
   late StorageService _storageService;
   late AIEvaluationService _aiService;
+  late PlanService _planService;
+  late AchievementService _achievementService;
   bool _servicesInitialized = false;
 
   @override
@@ -47,11 +55,39 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
       final supabaseService = await SupabaseService.getInstance();
       _storageService = StorageService(supabaseService);
       _aiService = AIEvaluationService(supabaseService);
+      _planService = PlanService(supabaseService);
+      _achievementService = AchievementService(supabaseService);
       setState(() {
         _servicesInitialized = true;
       });
+      await _checkLimits();
     } catch (e) {
       print('Erro ao inicializar serviços: $e');
+    }
+  }
+
+  Future<void> _checkLimits() async {
+    try {
+      final userId = _planService.currentUserId;
+      if (userId == null) return;
+
+      // Forçar atualização buscando diretamente o contador de fotos primeiro
+      final supabaseService = await SupabaseService.getInstance();
+      final photoService = PhotoService(supabaseService);
+      final storageCount = await photoService.getUserStorageCount();
+      
+      final limitCheck = await _planService.canEvaluatePhoto(userId);
+      safeSetState(() {
+        _model.canEvaluate = limitCheck.canEvaluate;
+        _model.limitMessage = limitCheck.reason;
+        _model.monthlyEvaluationsUsed = limitCheck.monthlyEvaluationsUsed;
+        _model.monthlyEvaluationsLimit = limitCheck.monthlyEvaluationsLimit;
+        // Usar o valor atualizado diretamente do contador
+        _model.storageUsed = storageCount;
+        _model.storageLimit = limitCheck.storageLimit;
+      });
+    } catch (e) {
+      print('Erro ao verificar limites: $e');
     }
   }
 
@@ -113,11 +149,62 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
         _model.evaluatedPhoto = photo;
         _model.isLoading = false;
       });
+
+      // Aguardar um pouco para garantir que a foto foi salva no banco e a UI está atualizada
+      await Future.delayed(const Duration(milliseconds: 1200));
+      
+      // Verificar e desbloquear conquistas após a UI estar completamente renderizada
+      if (mounted) {
+        // Usar WidgetsBinding para garantir que a UI está pronta
+        await WidgetsBinding.instance.endOfFrame;
+        
+        try {
+          final userId = supabaseService.currentUser?.id;
+          if (userId != null) {
+            print('Verificando conquistas para usuário: $userId');
+            final unlockedAchievements = await _achievementService.checkAndUnlockAchievements(userId);
+            print('Conquistas desbloqueadas: ${unlockedAchievements.length}');
+            
+            // Mostrar modal para cada conquista desbloqueada
+            if (unlockedAchievements.isNotEmpty && mounted) {
+              // Aguardar um pouco para garantir que a UI está completamente renderizada
+              await Future.delayed(const Duration(milliseconds: 500));
+              
+              for (var i = 0; i < unlockedAchievements.length; i++) {
+                final achievement = unlockedAchievements[i];
+                if (mounted) {
+                  print('Mostrando modal ${i + 1}/${unlockedAchievements.length} para conquista: ${achievement.title}');
+                  await AchievementUnlockedModal.show(context, achievement);
+                  // Aguardar um pouco entre modais para melhor UX (exceto no último)
+                  if (i < unlockedAchievements.length - 1) {
+                    await Future.delayed(const Duration(milliseconds: 500));
+                  }
+                }
+              }
+            } else {
+              print('Nenhuma conquista nova desbloqueada');
+            }
+          }
+        } catch (e, stackTrace) {
+          // Não falhar a avaliação se houver erro ao verificar conquistas
+          print('Erro ao verificar conquistas: $e');
+          print('Stack trace: $stackTrace');
+        }
+      }
+      
+      // Atualizar limites após avaliação (inclui contagem de fotos armazenadas)
+      await _checkLimits();
     } catch (e) {
       safeSetState(() {
         _model.isLoading = false;
         _model.errorMessage = e.toString();
       });
+
+      // Verificar se é erro de limite
+      final errorMessage = e.toString();
+      if (errorMessage.contains('Limite') || errorMessage.contains('limite')) {
+        await _checkLimits();
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -126,6 +213,431 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
         ),
       );
     }
+  }
+
+  Widget _buildEvaluationResultCard() {
+    final score = _model.evaluatedPhoto!.score;
+    final primaryColor = FlutterFlowTheme.of(context).primary;
+    
+    return Container(
+      margin: const EdgeInsetsDirectional.fromSTEB(20, 20, 20, 20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withOpacity(0.15),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Column(
+          children: [
+            // Imagem avaliada
+            if (_model.selectedImage != null)
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
+                ),
+                child: Image.file(
+                  _model.selectedImage!,
+                  width: double.infinity,
+                  height: 300.0,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            // Card de avaliação com gradiente
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    primaryColor,
+                    primaryColor.withOpacity(0.9),
+                    primaryColor.withOpacity(0.85),
+                  ],
+                ),
+              ),
+              child: Column(
+                children: [
+                  // Seção da nota com design moderno
+                  Padding(
+                    padding: const EdgeInsetsDirectional.fromSTEB(24, 32, 24, 24),
+                    child: Column(
+                      children: [
+                        // Nota em destaque
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              score.toStringAsFixed(2),
+                              style: GoogleFonts.poppins(
+                                fontSize: 64,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                height: 1.0,
+                                letterSpacing: -2,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black.withOpacity(0.2),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsetsDirectional.fromSTEB(8, 0, 0, 12),
+                              child: Text(
+                                '/ 10',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white.withOpacity(0.9),
+                                  height: 1.0,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Conteúdo do card com fundo branco/claro
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsetsDirectional.fromSTEB(24, 24, 24, 24),
+                    decoration: BoxDecoration(
+                      color: FlutterFlowTheme.of(context).secondaryBackground,
+                    ),
+                    child: Column(
+                      children: [
+                        // Recado com design moderno
+                        if (_model.evaluatedPhoto!.recado != null && _model.evaluatedPhoto!.recado!.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsetsDirectional.fromSTEB(20, 14, 20, 14),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  primaryColor.withOpacity(0.12),
+                                  primaryColor.withOpacity(0.06),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: primaryColor.withOpacity(0.2),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Text(
+                              _model.evaluatedPhoto!.recado!,
+                              style: GoogleFonts.poppins(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: primaryColor,
+                                letterSpacing: 0.0,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        // Observação com design moderno
+                        if (_model.evaluatedPhoto!.observacao != null &&
+                            _model.evaluatedPhoto!.observacao!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsetsDirectional.fromSTEB(0, 20, 0, 0),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsetsDirectional.fromSTEB(20, 20, 20, 20),
+                              decoration: BoxDecoration(
+                                color: FlutterFlowTheme.of(context).primaryBackground,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: FlutterFlowTheme.of(context).alternate.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.lightbulb_outline,
+                                        color: primaryColor,
+                                        size: 20,
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsetsDirectional.fromSTEB(8, 0, 0, 0),
+                                        child: Text(
+                                          'Observação:',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: FlutterFlowTheme.of(context).primaryText,
+                                            letterSpacing: 0.0,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsetsDirectional.fromSTEB(0, 12, 0, 0),
+                                    child: Text(
+                                      _model.evaluatedPhoto!.observacao!,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 15,
+                                        height: 1.5,
+                                        color: FlutterFlowTheme.of(context).primaryText,
+                                        letterSpacing: 0.0,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        // Categoria com design moderno
+                        if (_model.evaluatedPhoto!.categoria != null &&
+                            _model.evaluatedPhoto!.categoria!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsetsDirectional.fromSTEB(0, 20, 0, 0),
+                            child: Container(
+                              padding: const EdgeInsetsDirectional.fromSTEB(16, 10, 16, 10),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    FlutterFlowTheme.of(context).success.withOpacity(0.15),
+                                    FlutterFlowTheme.of(context).success.withOpacity(0.08),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: FlutterFlowTheme.of(context).success.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: FlutterFlowTheme.of(context).success.withOpacity(0.1),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.category_outlined,
+                                    size: 16,
+                                    color: FlutterFlowTheme.of(context).success,
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsetsDirectional.fromSTEB(6, 0, 0, 0),
+                                    child: Text(
+                                      _model.evaluatedPhoto!.categoria!,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: FlutterFlowTheme.of(context).success,
+                                        letterSpacing: 0.0,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        // Pontos Positivos
+                        if (_model.evaluatedPhoto!.positivePoints.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsetsDirectional.fromSTEB(0, 20, 0, 0),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsetsDirectional.fromSTEB(20, 20, 20, 20),
+                              decoration: BoxDecoration(
+                                color: FlutterFlowTheme.of(context).success.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: FlutterFlowTheme.of(context).success.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.check_circle_outline,
+                                        color: FlutterFlowTheme.of(context).success,
+                                        size: 20,
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsetsDirectional.fromSTEB(8, 0, 0, 0),
+                                        child: Text(
+                                          'Pontos Positivos:',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: FlutterFlowTheme.of(context).success,
+                                            letterSpacing: 0.0,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  ..._model.evaluatedPhoto!.positivePoints
+                                      .map((point) => Padding(
+                                            padding: const EdgeInsetsDirectional.fromSTEB(0, 12, 0, 0),
+                                            child: Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Icon(
+                                                  Icons.check_circle,
+                                                  color: FlutterFlowTheme.of(context).success,
+                                                  size: 20.0,
+                                                ),
+                                                Expanded(
+                                                  child: Padding(
+                                                    padding: const EdgeInsetsDirectional.fromSTEB(8, 0, 0, 0),
+                                                    child: Text(
+                                                      point,
+                                                      style: GoogleFonts.poppins(
+                                                        fontSize: 15,
+                                                        height: 1.5,
+                                                        color: FlutterFlowTheme.of(context).primaryText,
+                                                        letterSpacing: 0.0,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          )),
+                                ],
+                              ),
+                            ),
+                          ),
+                        // Pontos de Melhoria
+                        if (_model.evaluatedPhoto!.improvementPoints.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsetsDirectional.fromSTEB(0, 20, 0, 0),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsetsDirectional.fromSTEB(20, 20, 20, 20),
+                              decoration: BoxDecoration(
+                                color: FlutterFlowTheme.of(context).warning.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: FlutterFlowTheme.of(context).warning.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.info_outline,
+                                        color: FlutterFlowTheme.of(context).warning,
+                                        size: 20,
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsetsDirectional.fromSTEB(8, 0, 0, 0),
+                                        child: Text(
+                                          'Pontos de Melhoria:',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: FlutterFlowTheme.of(context).warning,
+                                            letterSpacing: 0.0,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  ..._model.evaluatedPhoto!.improvementPoints
+                                      .map((point) => Padding(
+                                            padding: const EdgeInsetsDirectional.fromSTEB(0, 12, 0, 0),
+                                            child: Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Icon(
+                                                  Icons.info_outline,
+                                                  color: FlutterFlowTheme.of(context).warning,
+                                                  size: 20.0,
+                                                ),
+                                                Expanded(
+                                                  child: Padding(
+                                                    padding: const EdgeInsetsDirectional.fromSTEB(8, 0, 0, 0),
+                                                    child: Text(
+                                                      point,
+                                                      style: GoogleFonts.poppins(
+                                                        fontSize: 15,
+                                                        height: 1.5,
+                                                        color: FlutterFlowTheme.of(context).primaryText,
+                                                        letterSpacing: 0.0,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          )),
+                                ],
+                              ),
+                            ),
+                          ),
+                        // Botão para analisar outra foto
+                        Padding(
+                          padding: const EdgeInsetsDirectional.fromSTEB(0, 24, 0, 0),
+                          child: FFButtonWidget(
+                            onPressed: () {
+                              safeSetState(() {
+                                _model.selectedImage = null;
+                                _model.evaluatedPhoto = null;
+                                _model.errorMessage = null;
+                              });
+                            },
+                            text: 'Analisar Outra Foto',
+                            options: FFButtonOptions(
+                              width: double.infinity,
+                              height: 50.0,
+                              padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 0.0),
+                              iconPadding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 0.0),
+                              color: FlutterFlowTheme.of(context).primary,
+                              textStyle: FlutterFlowTheme.of(context)
+                                  .titleSmall
+                                  .override(
+                                    font: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    color: Colors.white,
+                                    letterSpacing: 0.0,
+                                  ),
+                              elevation: 0,
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -482,13 +994,191 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
                                   ],
                                 ),
                               ),
+                              // Mensagem de limite atingido
+                              if (!_model.canEvaluate && _model.limitMessage != null)
+                                Padding(
+                                  padding: EdgeInsetsDirectional.fromSTEB(
+                                      0.0, 16.0, 0.0, 0.0),
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: EdgeInsetsDirectional.fromSTEB(16, 12, 16, 12),
+                                    decoration: BoxDecoration(
+                                      color: FlutterFlowTheme.of(context).error.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: FlutterFlowTheme.of(context).error,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.info_outline,
+                                              color: FlutterFlowTheme.of(context).error,
+                                              size: 20,
+                                            ),
+                                            Padding(
+                                              padding: EdgeInsetsDirectional.fromSTEB(8, 0, 0, 0),
+                                              child: Text(
+                                                'Limite Atingido',
+                                                style: FlutterFlowTheme.of(context).titleSmall.override(
+                                                      font: GoogleFonts.poppins(
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                      color: FlutterFlowTheme.of(context).error,
+                                                      letterSpacing: 0.0,
+                                                    ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        Padding(
+                                          padding: EdgeInsetsDirectional.fromSTEB(0, 8, 0, 0),
+                                          child: Text(
+                                            _model.limitMessage!,
+                                            style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                                  font: GoogleFonts.poppins(),
+                                                  letterSpacing: 0.0,
+                                                ),
+                                          ),
+                                        ),
+                                        // Progresso de uso
+                                        if (_model.monthlyEvaluationsLimit != null)
+                                          Padding(
+                                            padding: EdgeInsetsDirectional.fromSTEB(0, 8, 0, 0),
+                                            child: Text(
+                                              'Avaliações este mês: ${_model.monthlyEvaluationsUsed ?? 0}/${_model.monthlyEvaluationsLimit}',
+                                              style: FlutterFlowTheme.of(context).bodySmall.override(
+                                                    font: GoogleFonts.poppins(),
+                                                    color: FlutterFlowTheme.of(context).secondary,
+                                                    fontSize: 12,
+                                                    letterSpacing: 0.0,
+                                                  ),
+                                            ),
+                                          ),
+                                        if (_model.storageLimit != null)
+                                          Padding(
+                                            padding: EdgeInsetsDirectional.fromSTEB(0, 4, 0, 0),
+                                            child: Text(
+                                              'Armazenamento: ${_model.storageUsed}/${_model.storageLimit} fotos',
+                                              style: FlutterFlowTheme.of(context).bodySmall.override(
+                                                    font: GoogleFonts.poppins(),
+                                                    color: FlutterFlowTheme.of(context).secondary,
+                                                    fontSize: 12,
+                                                    letterSpacing: 0.0,
+                                                  ),
+                                            ),
+                                          ),
+                                        Padding(
+                                          padding: EdgeInsetsDirectional.fromSTEB(0, 12, 0, 0),
+                                          child: FFButtonWidget(
+                                            onPressed: () {
+                                              context.push('/plans');
+                                            },
+                                            text: 'Fazer Upgrade',
+                                            options: FFButtonOptions(
+                                              width: double.infinity,
+                                              height: 40,
+                                              padding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 0),
+                                              iconPadding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 0),
+                                              color: FlutterFlowTheme.of(context).primary,
+                                              textStyle: FlutterFlowTheme.of(context).titleSmall.override(
+                                                    font: GoogleFonts.poppins(
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                    color: Colors.white,
+                                                    letterSpacing: 0.0,
+                                                  ),
+                                              elevation: 0,
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              // Progresso de uso quando pode avaliar
+                              if (_model.canEvaluate && (_model.monthlyEvaluationsLimit != null || _model.storageLimit != null))
+                                Padding(
+                                  padding: EdgeInsetsDirectional.fromSTEB(
+                                      0.0, 16.0, 0.0, 0.0),
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: EdgeInsetsDirectional.fromSTEB(16, 12, 16, 12),
+                                    decoration: BoxDecoration(
+                                      color: FlutterFlowTheme.of(context).primaryBackground,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: FlutterFlowTheme.of(context).alternate,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        if (_model.monthlyEvaluationsLimit != null)
+                                          Padding(
+                                            padding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 8),
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Text(
+                                                  'Avaliações este mês',
+                                                  style: FlutterFlowTheme.of(context).bodySmall.override(
+                                                        font: GoogleFonts.poppins(),
+                                                        letterSpacing: 0.0,
+                                                      ),
+                                                ),
+                                                Text(
+                                                  '${_model.monthlyEvaluationsUsed ?? 0}/${_model.monthlyEvaluationsLimit}',
+                                                  style: FlutterFlowTheme.of(context).bodySmall.override(
+                                                        font: GoogleFonts.poppins(
+                                                          fontWeight: FontWeight.w600,
+                                                        ),
+                                                        letterSpacing: 0.0,
+                                                      ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        if (_model.storageLimit != null)
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                'Armazenamento',
+                                                style: FlutterFlowTheme.of(context).bodySmall.override(
+                                                      font: GoogleFonts.poppins(),
+                                                      letterSpacing: 0.0,
+                                                    ),
+                                              ),
+                                              Text(
+                                                '${_model.storageUsed}/${_model.storageLimit} fotos',
+                                                style: FlutterFlowTheme.of(context).bodySmall.override(
+                                                      font: GoogleFonts.poppins(
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                      letterSpacing: 0.0,
+                                                    ),
+                                              ),
+                                            ],
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               Padding(
                                 padding: EdgeInsetsDirectional.fromSTEB(
                                     0.0, 24.0, 0.0, 0.0),
                                 child: FFButtonWidget(
                                   onPressed: (_model.selectedImage != null && 
                                              !_model.isLoading && 
-                                             _servicesInitialized)
+                                             _servicesInitialized &&
+                                             _model.canEvaluate)
                                       ? () => _evaluatePhoto()
                                       : null,
                                   text: _model.isLoading 
@@ -632,307 +1322,7 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
                         ),
                       // Resultado da avaliação (mostrar apenas quando não está carregando e há resultado)
                       if (_model.evaluatedPhoto != null && !_model.isLoading)
-                        Container(
-                          width: double.infinity,
-                          margin: EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 20.0),
-                          decoration: BoxDecoration(
-                            color: FlutterFlowTheme.of(context).secondaryBackground,
-                            borderRadius: BorderRadius.circular(16.0),
-                            border: Border.all(
-                              color: FlutterFlowTheme.of(context).primary.withOpacity(0.2),
-                              width: 1.0,
-                            ),
-                          ),
-                          child: Padding(
-                            padding: EdgeInsetsDirectional.fromSTEB(24.0, 24.0, 24.0, 24.0),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.max,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                // Imagem avaliada
-                                if (_model.selectedImage != null)
-                                  Padding(
-                                    padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 24.0),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(12.0),
-                                      child: Image.file(
-                                        _model.selectedImage!,
-                                        width: double.infinity,
-                                        height: 300.0,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
-                                  ),
-                                // Nota em destaque
-                                Container(
-                                  width: 120.0,
-                                  height: 120.0,
-                                  decoration: BoxDecoration(
-                                    color: FlutterFlowTheme.of(context).primary,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          '${_model.evaluatedPhoto!.score.toStringAsFixed(2)}',
-                                          style: FlutterFlowTheme.of(context)
-                                              .displayMedium
-                                              .override(
-                                                font: GoogleFonts.poppins(
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                                color: Colors.white,
-                                                letterSpacing: 0.0,
-                                              ),
-                                        ),
-                                        Text(
-                                          '/ 10',
-                                          style: FlutterFlowTheme.of(context)
-                                              .bodyMedium
-                                              .override(
-                                                font: GoogleFonts.poppins(),
-                                                color: Colors.white.withOpacity(0.8),
-                                                fontSize: 14.0,
-                                                letterSpacing: 0.0,
-                                              ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                // Recado
-                                if (_model.evaluatedPhoto!.recado != null)
-                                  Padding(
-                                    padding: EdgeInsetsDirectional.fromSTEB(0.0, 16.0, 0.0, 0.0),
-                                    child: Container(
-                                      padding: EdgeInsetsDirectional.fromSTEB(16.0, 8.0, 16.0, 8.0),
-                                      decoration: BoxDecoration(
-                                        color: FlutterFlowTheme.of(context).primary.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(20.0),
-                                      ),
-                                      child: Text(
-                                        _model.evaluatedPhoto!.recado!,
-                                        style: FlutterFlowTheme.of(context)
-                                            .titleMedium
-                                            .override(
-                                              font: GoogleFonts.poppins(
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                              color: FlutterFlowTheme.of(context).primary,
-                                              letterSpacing: 0.0,
-                                            ),
-                                      ),
-                                    ),
-                                  ),
-                                // Observação
-                                if (_model.evaluatedPhoto!.observacao != null && _model.evaluatedPhoto!.observacao!.isNotEmpty)
-                                  Padding(
-                                    padding: EdgeInsetsDirectional.fromSTEB(0.0, 20.0, 0.0, 0.0),
-                                    child: Container(
-                                      width: double.infinity,
-                                      padding: EdgeInsetsDirectional.fromSTEB(16.0, 16.0, 16.0, 16.0),
-                                      decoration: BoxDecoration(
-                                        color: FlutterFlowTheme.of(context).primaryBackground,
-                                        borderRadius: BorderRadius.circular(12.0),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Observação:',
-                                            style: FlutterFlowTheme.of(context)
-                                                .titleSmall
-                                                .override(
-                                                  font: GoogleFonts.poppins(
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                  letterSpacing: 0.0,
-                                                ),
-                                          ),
-                                          Padding(
-                                            padding: EdgeInsetsDirectional.fromSTEB(0.0, 8.0, 0.0, 0.0),
-                                            child: Text(
-                                              _model.evaluatedPhoto!.observacao!,
-                                              style: FlutterFlowTheme.of(context)
-                                                  .bodyMedium
-                                                  .override(
-                                                    font: GoogleFonts.poppins(),
-                                                    letterSpacing: 0.0,
-                                                  ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                if (_model.evaluatedPhoto!.positivePoints.isNotEmpty)
-                                  Padding(
-                                    padding: EdgeInsetsDirectional.fromSTEB(
-                                        0.0, 20.0, 0.0, 0.0),
-                                    child: Container(
-                                      width: double.infinity,
-                                      padding: EdgeInsetsDirectional.fromSTEB(16.0, 16.0, 16.0, 16.0),
-                                      decoration: BoxDecoration(
-                                        color: FlutterFlowTheme.of(context).success.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(12.0),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Pontos Positivos:',
-                                            style: FlutterFlowTheme.of(context)
-                                                .titleSmall
-                                                .override(
-                                                  font: GoogleFonts.poppins(
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                  color: FlutterFlowTheme.of(context).success,
-                                                  letterSpacing: 0.0,
-                                                ),
-                                          ),
-                                          ..._model.evaluatedPhoto!.positivePoints
-                                              .map((point) => Padding(
-                                                    padding: EdgeInsetsDirectional
-                                                        .fromSTEB(0.0, 8.0, 0.0, 0.0),
-                                                    child: Row(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment.start,
-                                                      children: [
-                                                        Icon(
-                                                          Icons.check_circle,
-                                                          color: FlutterFlowTheme.of(
-                                                                  context)
-                                                              .success,
-                                                          size: 20.0,
-                                                        ),
-                                                        Expanded(
-                                                          child: Padding(
-                                                            padding: EdgeInsetsDirectional
-                                                                .fromSTEB(8.0, 0.0, 0.0, 0.0),
-                                                            child: Text(
-                                                              point,
-                                                              style: FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    font: GoogleFonts
-                                                                        .poppins(),
-                                                                    letterSpacing: 0.0,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  )),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                if (_model.evaluatedPhoto!.improvementPoints.isNotEmpty)
-                                  Padding(
-                                    padding: EdgeInsetsDirectional.fromSTEB(
-                                        0.0, 16.0, 0.0, 0.0),
-                                    child: Container(
-                                      width: double.infinity,
-                                      padding: EdgeInsetsDirectional.fromSTEB(16.0, 16.0, 16.0, 16.0),
-                                      decoration: BoxDecoration(
-                                        color: FlutterFlowTheme.of(context).warning.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(12.0),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Pontos de Melhoria:',
-                                            style: FlutterFlowTheme.of(context)
-                                                .titleSmall
-                                                .override(
-                                                  font: GoogleFonts.poppins(
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                  color: FlutterFlowTheme.of(context).warning,
-                                                  letterSpacing: 0.0,
-                                                ),
-                                          ),
-                                          ..._model.evaluatedPhoto!.improvementPoints
-                                              .map((point) => Padding(
-                                                    padding: EdgeInsetsDirectional
-                                                        .fromSTEB(0.0, 8.0, 0.0, 0.0),
-                                                    child: Row(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment.start,
-                                                      children: [
-                                                        Icon(
-                                                          Icons.info_outline,
-                                                          color: FlutterFlowTheme.of(
-                                                                  context)
-                                                              .warning,
-                                                          size: 20.0,
-                                                        ),
-                                                        Expanded(
-                                                          child: Padding(
-                                                            padding: EdgeInsetsDirectional
-                                                                .fromSTEB(8.0, 0.0, 0.0, 0.0),
-                                                            child: Text(
-                                                              point,
-                                                              style: FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    font: GoogleFonts
-                                                                        .poppins(),
-                                                                    letterSpacing: 0.0,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  )),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                // Botão para analisar outra foto
-                                Padding(
-                                  padding: EdgeInsetsDirectional.fromSTEB(0.0, 24.0, 0.0, 0.0),
-                                  child: FFButtonWidget(
-                                    onPressed: () {
-                                      safeSetState(() {
-                                        _model.selectedImage = null;
-                                        _model.evaluatedPhoto = null;
-                                        _model.errorMessage = null;
-                                      });
-                                    },
-                                    text: 'Analisar Outra Foto',
-                                    options: FFButtonOptions(
-                                      width: double.infinity,
-                                      height: 50.0,
-                                      padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 0.0),
-                                      iconPadding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 0.0),
-                                      color: FlutterFlowTheme.of(context).primary,
-                                      textStyle: FlutterFlowTheme.of(context)
-                                          .titleSmall
-                                          .override(
-                                            font: GoogleFonts.poppins(
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                            color: Colors.white,
-                                            letterSpacing: 0.0,
-                                          ),
-                                      elevation: 0,
-                                      borderRadius: BorderRadius.circular(12.0),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                        _buildEvaluationResultCard(),
                     ],
                   ),
                 ),
