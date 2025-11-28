@@ -2,6 +2,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 import 'storage_service.dart';
 import '../models/photo_model.dart';
+import '../utils/logger.dart';
+import '../utils/error_handler.dart';
+import '../utils/exceptions.dart';
 
 class PhotoService {
   final SupabaseService _supabaseService;
@@ -32,36 +35,55 @@ class PhotoService {
           .range(offset, offset + limit - 1);
 
       final photos = <PhotoModel>[];
+      final photoIds = <String>[];
 
+      // Extrair IDs das fotos para buscar likes em batch
+      for (final item in response) {
+        try {
+          final photoId = item['id'] as String?;
+          if (photoId != null) {
+            photoIds.add(photoId);
+          }
+        } catch (e, stackTrace) {
+          Logger.debug('Erro ao extrair ID da foto', e, stackTrace);
+        }
+      }
+
+      // Buscar todos os likes do usuário atual em uma única query (otimização N+1)
+      Set<String> likedPhotoIds = {};
+      if (currentUserId != null && photoIds.isNotEmpty) {
+        try {
+          final likesResponse = await _client
+              .from('likes')
+              .select('photo_id')
+              .eq('user_id', currentUserId!)
+              .inFilter('photo_id', photoIds);
+
+          likedPhotoIds = (likesResponse as List)
+              .map((like) => like['photo_id'] as String)
+              .toSet();
+        } catch (e, stackTrace) {
+          Logger.warning('Erro ao buscar likes em batch', e, stackTrace);
+          // Continua sem informações de likes se houver erro
+        }
+      }
+
+      // Processar fotos com informações de likes já disponíveis
       for (final item in response) {
         try {
           final userData = item['users'] as Map<String, dynamic>?;
           final photo = PhotoModel.fromJson(item);
           
-          // Verificar se o usuário atual curtiu esta foto
-          bool? isLiked;
-          if (currentUserId != null) {
-            try {
-              final likeResponse = await _client
-                  .from('likes')
-                  .select('id')
-                  .eq('photo_id', photo.id)
-                  .eq('user_id', currentUserId!)
-                  .maybeSingle();
-              isLiked = likeResponse != null;
-            } catch (e) {
-              // Se houver erro ao verificar like, continua sem o status
-              print('Erro ao verificar like: $e');
-            }
-          }
+          // Verificar se o usuário curtiu usando o Set pré-carregado
+          final isLiked = currentUserId != null && likedPhotoIds.contains(photo.id);
 
           photos.add(photo.copyWith(
             username: userData?['username'] as String?,
             userAvatarUrl: userData?['avatar_url'] as String?,
             isLiked: isLiked,
           ));
-        } catch (e) {
-          print('Erro ao processar foto: $e');
+        } catch (e, stackTrace) {
+          Logger.warning('Erro ao processar foto', e, stackTrace);
           // Continua processando outras fotos mesmo se uma falhar
         }
       }
@@ -270,8 +292,8 @@ class PhotoService {
       // Converter para lista e contar
       final photosList = response as List;
       return photosList.length;
-    } catch (e) {
-      print('Erro ao contar fotos armazenadas: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao contar fotos armazenadas', e, stackTrace);
       throw _handleError(e);
     }
   }
@@ -374,35 +396,55 @@ class PhotoService {
           .range(offset, offset + limit - 1);
 
       final photos = <PhotoModel>[];
+      final photoIds = <String>[];
+
+      // Extrair IDs das fotos para buscar likes em batch
+      for (final item in response) {
+        try {
+          final photoId = item['id'] as String?;
+          if (photoId != null) {
+            photoIds.add(photoId);
+          }
+        } catch (e, stackTrace) {
+          Logger.debug('Erro ao extrair ID da foto', e, stackTrace);
+        }
+      }
+
+      // Buscar todos os likes do usuário atual em uma única query (otimização N+1)
+      Set<String> likedPhotoIds = {};
+      if (currentUserId != null && photoIds.isNotEmpty) {
+        try {
+          final likesResponse = await _client
+              .from('likes')
+              .select('photo_id')
+              .eq('user_id', currentUserId!)
+              .inFilter('photo_id', photoIds);
+
+          likedPhotoIds = (likesResponse as List)
+              .map((like) => like['photo_id'] as String)
+              .toSet();
+        } catch (e, stackTrace) {
+          Logger.warning('Erro ao buscar likes em batch', e, stackTrace);
+          // Continua sem informações de likes se houver erro
+        }
+      }
+
+      // Processar fotos com informações de likes já disponíveis
       for (final item in response) {
         try {
           final userData = item['users'] as Map<String, dynamic>?;
           final photo = PhotoModel.fromJson(item);
           
-          // Verificar se o usuário atual curtiu esta foto
-          bool? isLiked;
-          if (currentUserId != null) {
-            try {
-              final likeResponse = await _client
-                  .from('likes')
-                  .select('id')
-                  .eq('photo_id', photo.id)
-                  .eq('user_id', currentUserId!)
-                  .maybeSingle();
-              isLiked = likeResponse != null;
-            } catch (e) {
-              // Se houver erro ao verificar like, continua sem o status
-              print('Erro ao verificar like: $e');
-            }
-          }
+          // Verificar se o usuário curtiu usando o Set pré-carregado
+          final isLiked = currentUserId != null && likedPhotoIds.contains(photo.id);
 
           photos.add(photo.copyWith(
             username: userData?['username'] as String?,
             userAvatarUrl: userData?['avatar_url'] as String?,
             isLiked: isLiked,
           ));
-        } catch (e) {
-          print('Erro ao processar foto: $e');
+        } catch (e, stackTrace) {
+          Logger.warning('Erro ao processar foto', e, stackTrace);
           // Continua processando outras fotos mesmo se uma falhar
         }
       }
@@ -438,14 +480,8 @@ class PhotoService {
     }
   }
 
-  Exception _handleError(dynamic error) {
-    if (error is PostgrestException) {
-      return Exception(error.message);
-    } else if (error is Exception) {
-      return error;
-    } else {
-      return Exception('Erro desconhecido: $error');
-    }
+  AppException _handleError(dynamic error) {
+    return ErrorHandler.handleError(error);
   }
 }
 

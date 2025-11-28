@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/logger.dart';
 import 'supabase_service.dart';
 import '../models/evaluation_result_model.dart';
 import '../models/photo_model.dart';
@@ -133,8 +134,7 @@ class AIEvaluationService {
       }
     } catch (e, stackTrace) {
       // Não falhar a avaliação se houver erro ao atualizar score
-      print('Erro ao atualizar pontuação mensal: $e');
-      print('Stack trace: $stackTrace');
+      Logger.error('Erro ao atualizar pontuação mensal', e, stackTrace);
     }
   }
 }

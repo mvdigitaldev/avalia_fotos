@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/logger.dart';
 import 'supabase_service.dart';
 import '../models/ranking_item_model.dart';
 import '../models/photo_model.dart';
@@ -29,7 +30,7 @@ class RankingService {
     required int year,
   }) async {
     try {
-      print('Buscando ranking: month=$month, year=$year, limit=$limit, offset=$offset');
+      Logger.debug('Buscando ranking: month=$month, year=$year, limit=$limit, offset=$offset');
       
       final response = await _client
           .from('user_monthly_scores')
@@ -47,7 +48,7 @@ class RankingService {
           .order('score', ascending: false)
           .range(offset, offset + limit - 1);
 
-      print('Resposta recebida: ${response.length} itens');
+      Logger.debug('Resposta recebida: ${response.length} itens');
       
       final users = <RankingItemModel>[];
       for (var i = 0; i < response.length; i++) {
@@ -95,17 +96,15 @@ class RankingService {
             position: offset + i + 1,
           ));
         } catch (e, stackTrace) {
-          print('Erro ao processar item $i do ranking: $e');
-          print('Stack trace: $stackTrace');
+          Logger.warning('Erro ao processar item $i do ranking', e, stackTrace);
           // Continuar processando outros itens mesmo se um falhar
         }
       }
       
-      print('Total de usuários processados: ${users.length}');
+      Logger.debug('Total de usuários processados: ${users.length}');
       return users;
     } catch (e, stackTrace) {
-      print('Erro no getTopUsersOfMonthPaginated: $e');
-      print('Stack trace: $stackTrace');
+      Logger.error('Erro no getTopUsersOfMonthPaginated', e, stackTrace);
       throw _handleError(e);
     }
   }

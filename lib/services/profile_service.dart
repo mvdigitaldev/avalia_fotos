@@ -1,6 +1,7 @@
 // lib/services/profile_service.dart
 import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/logger.dart';
 import 'supabase_service.dart';
 import '../models/user_model.dart';
 import 'storage_service.dart';
@@ -28,7 +29,8 @@ class ProfileService {
           .limit(1);
 
       return response.isEmpty;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao verificar disponibilidade do username', e, stackTrace);
       throw Exception('Erro ao verificar disponibilidade do username: $e');
     }
   }
@@ -64,9 +66,9 @@ class ProfileService {
             final oldFilePath = pathSegments.sublist(bucketIndex + 1).join('/');
             await _client.storage.from(bucketName).remove([oldFilePath]);
           }
-        } catch (e) {
+        } catch (e, stackTrace) {
           // Ignorar erro ao deletar avatar antigo
-          print('Erro ao deletar avatar antigo: $e');
+          Logger.warning('Erro ao deletar avatar antigo', e, stackTrace);
         }
       }
 
@@ -90,7 +92,9 @@ class ProfileService {
           .eq('id', currentUserId!);
 
       return publicUrl;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao atualizar avatar', e, stackTrace);
+      rethrow;
       throw Exception('Erro ao atualizar avatar: $e');
     }
   }
@@ -130,7 +134,8 @@ class ProfileService {
           .single();
 
       return UserModel.fromJson(response);
-    } catch (e) {
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao buscar perfil do usuário', e, stackTrace);
       if (e is Exception) {
         throw e;
       }
@@ -169,8 +174,8 @@ class ProfileService {
             final fileName = pathParts.last;
             await _client.storage.from(bucketName).remove([fileName]);
           }
-        } catch (e) {
-          print('Erro ao deletar foto do storage: $e');
+        } catch (e, stackTrace) {
+          Logger.warning('Erro ao deletar foto do storage', e, stackTrace);
           // Continuar mesmo se houver erro
         }
       }
@@ -193,8 +198,8 @@ class ProfileService {
               final fileName = pathParts.last;
               await _client.storage.from(bucketName).remove([fileName]);
             }
-          } catch (e) {
-            print('Erro ao deletar avatar do storage: $e');
+          } catch (e, stackTrace) {
+            Logger.warning('Erro ao deletar avatar do storage', e, stackTrace);
           }
         }
       }
@@ -241,26 +246,27 @@ class ProfileService {
 
         // Se a Edge Function funcionou, fazer signOut
         await _client.auth.signOut();
-      } catch (e) {
-        print('Erro ao chamar Edge Function para deletar conta: $e');
+      } catch (e, stackTrace) {
+        Logger.warning('Erro ao chamar Edge Function para deletar conta', e, stackTrace);
         // Fazer signOut mesmo se a Edge Function falhar
         // A conta do Auth pode precisar ser deletada manualmente no Supabase Dashboard
         try {
           await _client.auth.signOut();
-        } catch (signOutError) {
-          print('Erro ao fazer signOut: $signOutError');
+        } catch (signOutError, signOutStackTrace) {
+          Logger.warning('Erro ao fazer signOut', signOutError, signOutStackTrace);
         }
         throw Exception(
           'Conta deletada parcialmente. A conta do Auth pode precisar ser deletada manualmente no Supabase Dashboard.',
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Se admin.deleteUser não funcionar, tentar signOut
       try {
         await _client.auth.signOut();
-      } catch (signOutError) {
-        print('Erro ao fazer signOut: $signOutError');
+      } catch (signOutError, signOutStackTrace) {
+        Logger.warning('Erro ao fazer signOut', signOutError, signOutStackTrace);
       }
+      Logger.error('Erro ao deletar conta', e, stackTrace);
       throw Exception('Erro ao deletar conta: $e');
     }
   }
@@ -335,7 +341,8 @@ class ProfileService {
         'plan_expires_at': planExpiresAt,
         'is_free_plan': isFreePlan,
       };
-    } catch (e) {
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao buscar estatísticas do perfil', e, stackTrace);
       throw Exception('Erro ao buscar estatísticas do perfil: $e');
     }
   }

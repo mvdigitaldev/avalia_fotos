@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 import '../../services/supabase_service.dart';
 import '../../services/photo_service.dart';
 import '../../services/auth_service.dart';
+import '../../utils/logger.dart';
 import '../../models/comment_model.dart';
 import 'photo_detail_model.dart';
 export 'photo_detail_model.dart';
@@ -60,8 +61,8 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
         _servicesInitialized = true;
       });
       _loadPhotoDetails();
-    } catch (e) {
-      print('Erro ao inicializar serviços: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao inicializar serviços', e, stackTrace);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -101,8 +102,8 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
         _model.comments = commentModels;
         _model.isLoading = false;
       });
-    } catch (e) {
-      print('Erro ao carregar detalhes da foto: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao carregar detalhes da foto', e, stackTrace);
       safeSetState(() {
         _model.isLoading = false;
         _model.errorMessage = e.toString();

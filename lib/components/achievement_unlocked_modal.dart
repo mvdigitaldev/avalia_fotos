@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../models/achievement_model.dart';
+import '../utils/logger.dart';
 import '../flutter_flow/flutter_flow_theme.dart';
 import '../flutter_flow/flutter_flow_widgets.dart';
 
@@ -17,7 +18,7 @@ class AchievementUnlockedModal extends StatelessWidget {
     AchievementModel achievement,
   ) async {
     try {
-      print('Tentando mostrar modal para conquista: ${achievement.title}');
+      Logger.debug('Tentando mostrar modal para conquista: ${achievement.title}');
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -26,10 +27,9 @@ class AchievementUnlockedModal extends StatelessWidget {
           achievement: achievement,
         ),
       );
-      print('Modal fechado para conquista: ${achievement.title}');
+      Logger.debug('Modal fechado para conquista: ${achievement.title}');
     } catch (e, stackTrace) {
-      print('Erro ao mostrar modal de conquista: $e');
-      print('Stack trace: $stackTrace');
+      Logger.error('Erro ao mostrar modal de conquista', e, stackTrace);
     }
   }
 

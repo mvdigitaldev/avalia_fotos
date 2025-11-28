@@ -10,6 +10,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '/flutter_flow/nav/nav.dart';
 import '../services/supabase_service.dart';
 import '../services/auth_service.dart';
+import '../utils/logger.dart';
 import 'login_model.dart';
 export 'login_model.dart';
 
@@ -27,8 +28,9 @@ class _LoginWidgetState extends State<LoginWidget> {
   late LoginModel _model;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
-  late AuthService _authService;
+  AuthService? _authService;
   bool _isLoading = false;
+  bool _servicesInitialized = false;
 
   @override
   void initState() {
@@ -46,11 +48,47 @@ class _LoginWidgetState extends State<LoginWidget> {
   }
 
   Future<void> _initializeServices() async {
-    final supabaseService = await SupabaseService.getInstance();
-    _authService = AuthService(supabaseService);
+    try {
+      final supabaseService = await SupabaseService.getInstance();
+      setState(() {
+        _authService = AuthService(supabaseService);
+        _servicesInitialized = true;
+      });
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao inicializar serviços no login', e, stackTrace);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao inicializar serviços. Por favor, reinicie o app.'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _handleLogin() async {
+    // Verificar se os serviços foram inicializados
+    if (!_servicesInitialized || _authService == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Aguarde, inicializando serviços...'),
+          backgroundColor: FlutterFlowTheme.of(context).warning,
+        ),
+      );
+      // Tentar inicializar novamente
+      await _initializeServices();
+      if (!_servicesInitialized || _authService == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao inicializar serviços. Por favor, reinicie o app.'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+        return;
+      }
+    }
+
     if (_model.textController1?.text.isEmpty ?? true) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor, insira seu email')),
@@ -70,7 +108,7 @@ class _LoginWidgetState extends State<LoginWidget> {
     });
 
     try {
-      await _authService.signInWithEmail(
+      await _authService!.signInWithEmail(
         email: _model.textController1!.text.trim(),
         password: _model.textController2!.text,
       );
@@ -580,10 +618,12 @@ class _LoginWidgetState extends State<LoginWidget> {
                                     padding: EdgeInsetsDirectional.fromSTEB(
                                         0.0, 16.0, 0.0, 0.0),
                                     child: FFButtonWidget(
-                                      onPressed: _isLoading ? null : () async {
+                                      onPressed: (_isLoading || !_servicesInitialized) ? null : () async {
                                         await _handleLogin();
                                       },
-                                      text: _isLoading ? 'Entrando...' : 'Entrar!',
+                                      text: !_servicesInitialized 
+                                          ? 'Inicializando...' 
+                                          : (_isLoading ? 'Entrando...' : 'Entrar!'),
                                       options: FFButtonOptions(
                                         width: double.infinity,
                                         height: 50.0,

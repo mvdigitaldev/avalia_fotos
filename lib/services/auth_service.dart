@@ -1,13 +1,23 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 import '../models/user_model.dart';
+import '../utils/logger.dart';
+import '../utils/error_handler.dart';
+import '../utils/exceptions.dart';
 
 class AuthService {
   final SupabaseService _supabaseService;
 
   AuthService(this._supabaseService);
 
-  SupabaseClient get _client => _supabaseService.client;
+  SupabaseClient get _client {
+    try {
+      return _supabaseService.client;
+    } catch (e) {
+      Logger.error('Erro ao acessar cliente Supabase no AuthService', e);
+      rethrow;
+    }
+  }
 
   User? get currentUser => _supabaseService.currentUser;
 
@@ -85,8 +95,8 @@ class AuthService {
         if (userProfile != null) {
           return userProfile;
         }
-      } catch (e) {
-        print('Trigger não criou o registro ou ainda não está disponível: $e');
+      } catch (e, stackTrace) {
+        Logger.debug('Trigger não criou o registro ou ainda não está disponível', e, stackTrace);
       }
 
       // Se o trigger não funcionou, criar manualmente usando RPC
@@ -114,12 +124,12 @@ class AuthService {
             final success = rpcResponse['success'] as bool? ?? false;
             if (!success) {
               final error = rpcResponse['error'] as String? ?? 'Erro desconhecido';
-              print('RPC retornou erro: $error');
+              Logger.warning('RPC retornou erro: $error');
               throw Exception('Erro ao criar perfil: $error');
             }
           }
-        } catch (rpcError) {
-          print('Erro ao chamar RPC: $rpcError');
+        } catch (rpcError, stackTrace) {
+          Logger.warning('Erro ao chamar RPC', rpcError, stackTrace);
           // Continuar para tentar inserção direta
           rethrow;
         }
@@ -161,15 +171,15 @@ class AuthService {
           if (userProfile != null) {
             return userProfile;
           }
-        } catch (insertError) {
-          print('Erro ao inserir diretamente: $insertError');
+        } catch (insertError, stackTrace) {
+          Logger.warning('Erro ao inserir diretamente', insertError, stackTrace);
         }
 
         // Se chegou aqui, nenhum método funcionou
         // Mas o usuário foi criado no Auth, então pedir para fazer login
         throw Exception('Conta criada no sistema de autenticação, mas houve um erro ao criar o perfil. Por favor, faça login novamente.');
-      } catch (e) {
-        print('Erro geral ao criar perfil: $e');
+      } catch (e, stackTrace) {
+        Logger.error('Erro geral ao criar perfil', e, stackTrace);
         // Se o usuário foi criado no Auth mas não no banco, pedir para fazer login
         throw Exception('Conta criada, mas houve um erro ao criar o perfil. Por favor, faça login novamente - seu perfil será criado automaticamente.');
       }
@@ -247,16 +257,8 @@ class AuthService {
     }
   }
 
-  Exception _handleError(dynamic error) {
-    if (error is AuthException) {
-      return Exception(error.message);
-    } else if (error is PostgrestException) {
-      return Exception(error.message);
-    } else if (error is Exception) {
-      return error;
-    } else {
-      return Exception('Erro desconhecido: $error');
-    }
+  AppException _handleError(dynamic error) {
+    return ErrorHandler.handleError(error);
   }
 }
 

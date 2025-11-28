@@ -1,13 +1,16 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '/flutter_flow/nav/nav.dart';
 import '/services/supabase_service.dart';
+import '/utils/logger.dart';
 import 'index.dart';
 
 void main() async {
@@ -15,14 +18,40 @@ void main() async {
   GoRouter.optionURLReflectsImperativeAPIs = true;
   usePathUrlStrategy();
 
+  // Carregar variáveis de ambiente
+  // Na web, o arquivo .env precisa estar nos assets ou usar --dart-define
+  // Em mobile, pode carregar do sistema de arquivos
+  if (!kIsWeb) {
+    try {
+      await dotenv.load(fileName: '.env');
+      Logger.info('Variáveis de ambiente carregadas do arquivo .env');
+    } catch (e, stackTrace) {
+      // Arquivo .env não encontrado - isso é normal se estiver usando --dart-define
+      Logger.debug('Arquivo .env não encontrado ou erro ao carregar', e, stackTrace);
+      Logger.debug('Usando variáveis de ambiente do sistema ou --dart-define ou fallback');
+    }
+  } else {
+    // Na web, tentar carregar do assets (se configurado) ou usar --dart-define
+    Logger.debug('Plataforma web detectada - usando --dart-define ou fallback para variáveis de ambiente');
+  }
+
   await FlutterFlowTheme.initialize();
   
-  // Inicializar Supabase
+  // Inicializar Supabase ANTES de criar o app
+  // Isso é crítico porque o router e AppStateNotifier dependem do Supabase
   try {
     await SupabaseService.getInstance();
-  } catch (e) {
-    print('Erro ao inicializar Supabase: $e');
-    // Continuar mesmo se houver erro (para desenvolvimento)
+    Logger.info('Supabase inicializado com sucesso no main()');
+  } catch (e, stackTrace) {
+    Logger.error('Erro crítico ao inicializar Supabase no main()', e, stackTrace);
+    // Tentar inicializar novamente com fallback
+    try {
+      // Forçar inicialização mesmo com erro
+      await SupabaseService.getInstance();
+    } catch (e2, stackTrace2) {
+      Logger.critical('Falha crítica na inicialização do Supabase', e2, stackTrace2);
+      // Continuar mesmo assim - o fallback deve funcionar
+    }
   }
 
   runApp(MyApp());

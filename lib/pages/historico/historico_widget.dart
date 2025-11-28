@@ -10,6 +10,7 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/supabase_service.dart';
 import '../../services/photo_service.dart';
+import '../../utils/logger.dart';
 import '../../models/photo_model.dart';
 import 'historico_model.dart';
 export 'historico_model.dart';
@@ -58,8 +59,8 @@ class _HistoricoWidgetState extends State<HistoricoWidget> {
       });
       await _loadPhotos();
       await _loadTotalPhotos();
-    } catch (e) {
-      print('Erro ao inicializar serviços: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao inicializar serviços', e, stackTrace);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -77,8 +78,8 @@ class _HistoricoWidgetState extends State<HistoricoWidget> {
       safeSetState(() {
         _model.totalPhotos = count;
       });
-    } catch (e) {
-      print('Erro ao carregar total de fotos: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao carregar total de fotos', e, stackTrace);
     }
   }
 
@@ -119,8 +120,8 @@ class _HistoricoWidgetState extends State<HistoricoWidget> {
       if (refresh) {
         await _loadTotalPhotos();
       }
-    } catch (e) {
-      print('Erro ao carregar fotos: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao carregar fotos', e, stackTrace);
       safeSetState(() {
         _model.isLoading = false;
       });

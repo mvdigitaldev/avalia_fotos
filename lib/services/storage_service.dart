@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/logger.dart';
 import 'supabase_service.dart';
 
 class StorageService {
@@ -110,8 +111,8 @@ class StorageService {
           final filePath = pathSegments.sublist(bucketIndex + 1).join('/');
           filePaths.add(filePath);
         }
-      } catch (e) {
-        print('Erro ao processar URL $imageUrl: $e');
+      } catch (e, stackTrace) {
+        Logger.warning('Erro ao processar URL $imageUrl', e, stackTrace);
       }
     }
 
@@ -128,8 +129,8 @@ class StorageService {
           try {
             await deletePhoto(imageUrls[i]);
             deletedUrls.add(imageUrls[i]);
-          } catch (individualError) {
-            print('Erro ao deletar foto individual ${imageUrls[i]}: $individualError');
+          } catch (individualError, stackTrace) {
+            Logger.warning('Erro ao deletar foto individual ${imageUrls[i]}', individualError, stackTrace);
           }
         }
       } else {

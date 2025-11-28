@@ -11,6 +11,7 @@ import 'package:intl/intl.dart';
 import '../../services/supabase_service.dart';
 import '../../services/achievement_service.dart';
 import '../../models/achievement_model.dart';
+import '../../utils/logger.dart';
 import '../../components/achievement_card.dart';
 import 'conquistas_model.dart';
 export 'conquistas_model.dart';
@@ -47,8 +48,8 @@ class _ConquistasWidgetState extends State<ConquistasWidget> {
         _servicesInitialized = true;
       });
       await _loadAchievements();
-    } catch (e) {
-      print('Erro ao inicializar serviços: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao inicializar serviços', e, stackTrace);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -81,8 +82,8 @@ class _ConquistasWidgetState extends State<ConquistasWidget> {
         _model.userStats = stats;
         _model.isLoading = false;
       });
-    } catch (e) {
-      print('Erro ao carregar conquistas: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao carregar conquistas', e, stackTrace);
       safeSetState(() {
         _model.isLoading = false;
         _model.errorMessage = 'Erro ao carregar conquistas: $e';

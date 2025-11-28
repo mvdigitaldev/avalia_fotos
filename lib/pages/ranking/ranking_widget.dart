@@ -10,6 +10,7 @@ import '../../services/supabase_service.dart';
 import '../../services/ranking_service.dart';
 import '../../models/ranking_item_model.dart';
 import '../../models/photo_model.dart';
+import '../../utils/logger.dart';
 import '../../components/ranking_user_card.dart';
 import '../../components/ranking_photo_card.dart';
 import '../../components/load_more_button.dart';
@@ -64,8 +65,8 @@ class _RankingWidgetState extends State<RankingWidget>
       });
       _loadUsersRanking(refresh: true);
       _loadPhotosRanking(refresh: true);
-    } catch (e) {
-      print('Erro ao inicializar serviços: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao inicializar serviços', e, stackTrace);
       safeSetState(() {
         _model.errorMessage = 'Erro ao inicializar serviços: $e';
       });
@@ -74,11 +75,11 @@ class _RankingWidgetState extends State<RankingWidget>
 
   Future<void> _loadUsersRanking({bool refresh = false}) async {
     if (_model.isLoadingUsers || !_servicesInitialized) {
-      print('Pulando carregamento: isLoadingUsers=${_model.isLoadingUsers}, initialized=$_servicesInitialized');
+      Logger.debug('Pulando carregamento: isLoadingUsers=${_model.isLoadingUsers}, initialized=$_servicesInitialized');
       return;
     }
 
-    print('Iniciando carregamento de usuários: refresh=$refresh');
+    Logger.debug('Iniciando carregamento de usuários: refresh=$refresh');
 
     if (mounted) {
       setState(() {
@@ -98,7 +99,7 @@ class _RankingWidgetState extends State<RankingWidget>
       final limit = 10;
       final offset = _model.currentUsersPage * limit;
 
-      print('Chamando serviço: month=$month, year=$year, limit=$limit, offset=$offset');
+      Logger.debug('Chamando serviço: month=$month, year=$year, limit=$limit, offset=$offset');
 
       final users = await _rankingService.getTopUsersOfMonthPaginated(
         limit: limit,
@@ -107,9 +108,9 @@ class _RankingWidgetState extends State<RankingWidget>
         year: year,
       );
 
-      print('Usuários carregados: ${users.length} para mês $month/$year');
+      Logger.debug('Usuários carregados: ${users.length} para mês $month/$year');
       if (users.isNotEmpty) {
-        print('Primeiro usuário: ${users.first.username} - ${users.first.score}');
+        Logger.debug('Primeiro usuário: ${users.first.username} - ${users.first.score}');
       }
 
       if (mounted) {
@@ -123,11 +124,10 @@ class _RankingWidgetState extends State<RankingWidget>
           _model.currentUsersPage++;
           _model.isLoadingUsers = false;
         });
-        print('Estado atualizado: ${_model.users.length} usuários na lista');
+        Logger.debug('Estado atualizado: ${_model.users.length} usuários na lista');
       }
     } catch (e, stackTrace) {
-      print('Erro ao carregar ranking de usuários: $e');
-      print('Stack trace: $stackTrace');
+      Logger.error('Erro ao carregar ranking de usuários', e, stackTrace);
       if (mounted) {
         setState(() {
           _model.isLoadingUsers = false;
@@ -172,8 +172,8 @@ class _RankingWidgetState extends State<RankingWidget>
         _model.currentPhotosPage++;
         _model.isLoadingPhotos = false;
       });
-    } catch (e) {
-      print('Erro ao carregar ranking de fotos: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao carregar ranking de fotos', e, stackTrace);
       safeSetState(() {
         _model.isLoadingPhotos = false;
         _model.errorMessage = 'Erro ao carregar ranking de fotos: $e';
@@ -243,11 +243,11 @@ class _RankingWidgetState extends State<RankingWidget>
     // Criar lista de widgets de forma explícita
     final List<Widget> userWidgets = [];
     
-    print('_buildUsersTab: Construindo ${_model.users.length} cards');
+    Logger.debug('_buildUsersTab: Construindo ${_model.users.length} cards');
     
     for (var i = 0; i < _model.users.length; i++) {
       final user = _model.users[i];
-      print('Criando card $i: userId=${user.userId}, username=${user.username}, position=${user.position}');
+      Logger.debug('Criando card $i: userId=${user.userId}, username=${user.username}, position=${user.position}');
       
       try {
         userWidgets.add(
@@ -257,10 +257,9 @@ class _RankingWidgetState extends State<RankingWidget>
             isTopThree: user.position <= 3,
           ),
         );
-        print('Card $i criado com sucesso');
+        Logger.debug('Card $i criado com sucesso');
       } catch (e, stackTrace) {
-        print('Erro ao criar card $i: $e');
-        print('Stack trace: $stackTrace');
+        Logger.warning('Erro ao criar card $i', e, stackTrace);
         // Adicionar um widget de erro como fallback
         userWidgets.add(
           Container(
@@ -290,7 +289,7 @@ class _RankingWidgetState extends State<RankingWidget>
       ),
     );
     
-    print('Total de widgets criados: ${userWidgets.length}');
+    Logger.debug('Total de widgets criados: ${userWidgets.length}');
     
     return ListView(
       padding: EdgeInsetsDirectional.fromSTEB(20.0, 16.0, 20.0, 16.0),

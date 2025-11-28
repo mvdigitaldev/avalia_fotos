@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../../services/supabase_service.dart';
 import '../../services/photo_service.dart';
 import '../../models/photo_model.dart';
+import '../../utils/logger.dart';
 import '../../components/inspirar_filters_drawer.dart';
 import 'inspirar_model.dart';
 export 'inspirar_model.dart';
@@ -59,8 +60,8 @@ class _InspirarWidgetState extends State<InspirarWidget> {
       });
       await _loadCategories();
       // Não carregar fotos inicialmente - aguardar filtros do usuário
-    } catch (e) {
-      print('Erro ao inicializar serviços: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao inicializar serviços', e, stackTrace);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -82,8 +83,8 @@ class _InspirarWidgetState extends State<InspirarWidget> {
         _model.availableCategories = categories;
         _model.isLoadingCategories = false;
       });
-    } catch (e) {
-      print('Erro ao carregar categorias: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao carregar categorias', e, stackTrace);
       safeSetState(() {
         _model.isLoadingCategories = false;
       });
@@ -123,8 +124,8 @@ class _InspirarWidgetState extends State<InspirarWidget> {
         _model.isLoading = false;
         _model.totalResults = _model.photos.length;
       });
-    } catch (e) {
-      print('Erro ao carregar fotos filtradas: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao carregar fotos filtradas', e, stackTrace);
       safeSetState(() {
         _model.isLoading = false;
       });

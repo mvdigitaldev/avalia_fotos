@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../services/supabase_service.dart';
+import '../../utils/logger.dart';
 import 'tutorial_suporte_model.dart';
 export 'tutorial_suporte_model.dart';
 
@@ -47,8 +48,8 @@ class _TutorialSuporteWidgetState extends State<TutorialSuporteWidget> {
                        orElse: () => '',
                      );
       return videoId.isNotEmpty ? videoId : null;
-    } catch (e) {
-      print('Erro ao extrair ID do YouTube: $e');
+    } catch (e, stackTrace) {
+      Logger.warning('Erro ao extrair ID do YouTube', e, stackTrace);
       return null;
     }
   }
@@ -175,8 +176,8 @@ class _TutorialSuporteWidgetState extends State<TutorialSuporteWidget> {
               .maybeSingle();
 
           userHasActivePlan = planResponse != null;
-        } catch (e) {
-          print('Erro ao verificar plano do usuário: $e');
+        } catch (e, stackTrace) {
+          Logger.warning('Erro ao verificar plano do usuário', e, stackTrace);
           // Continuar mesmo se houver erro na verificação do plano
         }
       }
@@ -202,8 +203,8 @@ class _TutorialSuporteWidgetState extends State<TutorialSuporteWidget> {
           errorMessage = 'Configuração não encontrada. Verifique se a tabela system_configuration possui dados.';
         });
       }
-    } catch (e) {
-      print('Erro ao carregar configuração: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao carregar configuração', e, stackTrace);
       setState(() {
         isLoading = false;
         errorMessage = 'Erro ao carregar configurações: $e';

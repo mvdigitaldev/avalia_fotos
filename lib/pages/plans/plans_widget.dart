@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import '../../services/supabase_service.dart';
 import '../../services/plan_service.dart';
 import '../../services/payment_service.dart';
+import '../../utils/logger.dart';
 import '../../models/plan_model.dart';
 import '../../models/user_plan_model.dart';
 import '../../models/payment_history_model.dart';
@@ -59,8 +60,8 @@ class _PlansWidgetState extends State<PlansWidget> with TickerProviderStateMixin
       });
       await _loadPlans();
       await _loadPaymentHistory();
-    } catch (e) {
-      print('Erro ao inicializar serviços: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao inicializar serviços', e, stackTrace);
       safeSetState(() {
         _model.isLoading = false;
         _model.errorMessage = e.toString();
@@ -81,8 +82,8 @@ class _PlansWidgetState extends State<PlansWidget> with TickerProviderStateMixin
         _model.paymentHistory = history;
         _model.isLoadingHistory = false;
       });
-    } catch (e) {
-      print('Erro ao carregar histórico de pagamentos: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao carregar histórico de pagamentos', e, stackTrace);
       safeSetState(() {
         _model.isLoadingHistory = false;
       });

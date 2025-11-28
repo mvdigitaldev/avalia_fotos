@@ -1,8 +1,15 @@
+/// Configuração do Supabase
+/// 
+/// **IMPORTANTE**: Este arquivo não deve conter credenciais hardcoded.
+/// Use variáveis de ambiente através de:
+/// - Arquivo .env (flutter_dotenv)
+/// - --dart-define na linha de comando
+/// - Variáveis de ambiente do sistema
+/// 
+/// Veja .env.example para exemplo de configuração.
 class SupabaseConfig {
-  // Configure essas URLs via --dart-define ou arquivo .env
-  // Para produção, use variáveis de ambiente
-  static const String supabaseUrl = 'https://yulxxamlfxujclnzzcjb.supabase.co';
-  static const String supabaseAnonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1bHh4YW1sZnh1amNsbnp6Y2piIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNTYwMjgsImV4cCI6MjA3OTczMjAyOH0.UcUbYxhnaXwvGYokwthKJRwk5MlHt-GMtZsslohbwdM';
+  // Este arquivo foi mantido apenas para compatibilidade
+  // As credenciais agora são carregadas via SupabaseService._loadConfig()
+  // que prioriza variáveis de ambiente sobre valores hardcoded
 }
 

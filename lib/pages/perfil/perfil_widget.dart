@@ -13,6 +13,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../services/supabase_service.dart';
 import '../../services/profile_service.dart';
+import '../../utils/logger.dart';
 import '../../services/auth_service.dart';
 import 'perfil_model.dart';
 export 'perfil_model.dart';
@@ -51,8 +52,8 @@ class _PerfilWidgetState extends State<PerfilWidget> {
         _servicesInitialized = true;
       });
       _loadProfileData();
-    } catch (e) {
-      print('Erro ao inicializar serviços: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao inicializar serviços', e, stackTrace);
       safeSetState(() {
         _model.errorMessage = 'Erro ao inicializar serviços: $e';
         _model.isLoading = false;
@@ -87,8 +88,8 @@ class _PerfilWidgetState extends State<PerfilWidget> {
         if (configResponse != null) {
           habilitarPlanos = configResponse['habilitar_planos'] as bool? ?? false;
         }
-      } catch (e) {
-        print('Erro ao buscar configuração habilitar_planos: $e');
+      } catch (e, stackTrace) {
+        Logger.warning('Erro ao buscar configuração habilitar_planos', e, stackTrace);
       }
       
       safeSetState(() {
@@ -103,8 +104,8 @@ class _PerfilWidgetState extends State<PerfilWidget> {
         _model.habilitarPlanos = habilitarPlanos;
         _model.isLoading = false;
       });
-    } catch (e) {
-      print('Erro ao carregar dados do perfil: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao carregar dados do perfil', e, stackTrace);
       safeSetState(() {
         _model.errorMessage = 'Erro ao carregar dados do perfil: $e';
         _model.isLoading = false;

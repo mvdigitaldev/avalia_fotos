@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:from_css_color/from_css_color.dart';
 
+import '../../utils/logger.dart';
 import '../../flutter_flow/lat_lng.dart';
 import '../../flutter_flow/place.dart';
 import '../../flutter_flow/uploaded_file.dart';
@@ -74,8 +75,8 @@ String? serializeParam(
         data = null;
     }
     return data;
-  } catch (e) {
-    print('Error serializing parameter: $e');
+  } catch (e, stackTrace) {
+    Logger.warning('Error serializing parameter', e, stackTrace);
     return null;
   }
 }
@@ -199,8 +200,8 @@ dynamic deserializeParam<T>(
       default:
         return null;
     }
-  } catch (e) {
-    print('Error deserializing parameter: $e');
+  } catch (e, stackTrace) {
+    Logger.warning('Error deserializing parameter', e, stackTrace);
     return null;
   }
 }

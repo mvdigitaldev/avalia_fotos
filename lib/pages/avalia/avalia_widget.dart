@@ -13,6 +13,7 @@ import '../../services/storage_service.dart';
 import '../../services/ai_evaluation_service.dart';
 import '../../services/plan_service.dart';
 import '../../services/photo_service.dart';
+import '../../utils/logger.dart';
 import '../../services/achievement_service.dart';
 import '../../models/photo_model.dart';
 import '../../models/achievement_model.dart';
@@ -61,8 +62,8 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
         _servicesInitialized = true;
       });
       await _checkLimits();
-    } catch (e) {
-      print('Erro ao inicializar serviços: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao inicializar serviços', e, stackTrace);
     }
   }
 
@@ -86,8 +87,8 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
         _model.storageUsed = storageCount;
         _model.storageLimit = limitCheck.storageLimit;
       });
-    } catch (e) {
-      print('Erro ao verificar limites: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao verificar limites', e, stackTrace);
     }
   }
 
@@ -161,9 +162,9 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
         try {
           final userId = supabaseService.currentUser?.id;
           if (userId != null) {
-            print('Verificando conquistas para usuário: $userId');
+            Logger.debug('Verificando conquistas para usuário: $userId');
             final unlockedAchievements = await _achievementService.checkAndUnlockAchievements(userId);
-            print('Conquistas desbloqueadas: ${unlockedAchievements.length}');
+            Logger.debug('Conquistas desbloqueadas: ${unlockedAchievements.length}');
             
             // Mostrar modal para cada conquista desbloqueada
             if (unlockedAchievements.isNotEmpty && mounted) {
@@ -173,7 +174,7 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
               for (var i = 0; i < unlockedAchievements.length; i++) {
                 final achievement = unlockedAchievements[i];
                 if (mounted) {
-                  print('Mostrando modal ${i + 1}/${unlockedAchievements.length} para conquista: ${achievement.title}');
+                  Logger.debug('Mostrando modal ${i + 1}/${unlockedAchievements.length} para conquista: ${achievement.title}');
                   await AchievementUnlockedModal.show(context, achievement);
                   // Aguardar um pouco entre modais para melhor UX (exceto no último)
                   if (i < unlockedAchievements.length - 1) {
@@ -182,13 +183,12 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
                 }
               }
             } else {
-              print('Nenhuma conquista nova desbloqueada');
+              Logger.debug('Nenhuma conquista nova desbloqueada');
             }
           }
         } catch (e, stackTrace) {
           // Não falhar a avaliação se houver erro ao verificar conquistas
-          print('Erro ao verificar conquistas: $e');
-          print('Stack trace: $stackTrace');
+          Logger.error('Erro ao verificar conquistas', e, stackTrace);
         }
       }
       

@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../main.dart';
 import '../../services/supabase_service.dart';
+import '../../utils/logger.dart';
 import 'opcoes_model.dart';
 export 'opcoes_model.dart';
 
@@ -109,8 +110,8 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
         isFreePlan = planIsFree;
         isLoadingPlan = false;
       });
-    } catch (e) {
-      print('Erro ao carregar informações do plano: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao carregar informações do plano', e, stackTrace);
       setState(() {
         isLoadingPlan = false;
       });

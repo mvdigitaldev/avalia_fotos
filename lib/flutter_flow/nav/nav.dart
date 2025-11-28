@@ -13,6 +13,7 @@ import '/flutter_flow/place.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'serialization_util.dart';
 import '/services/supabase_service.dart';
+import '/utils/logger.dart';
 
 import '/index.dart';
 
@@ -38,7 +39,8 @@ GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 class AppStateNotifier extends ChangeNotifier {
   AppStateNotifier._() {
-    // Escutar mudanças de autenticação
+    // Escutar mudanças de autenticação de forma assíncrona
+    // Não inicializar aqui porque pode ser chamado antes do Supabase estar pronto
     _initializeAuthListener();
   }
 
@@ -47,16 +49,29 @@ class AppStateNotifier extends ChangeNotifier {
 
   bool showSplashImage = true;
   StreamSubscription<AuthState>? _authSubscription;
+  bool _listenerInitialized = false;
 
   void _initializeAuthListener() {
+    // Evitar múltiplas inicializações
+    if (_listenerInitialized) return;
+    
     // Inicializar listener de autenticação de forma assíncrona
     SupabaseService.getInstance().then((service) {
+      if (_listenerInitialized) return; // Verificar novamente após await
+      _listenerInitialized = true;
       _authSubscription = service.authStateChanges.listen((authState) {
         // Notificar listeners quando o estado de autenticação mudar
         notifyListeners();
       });
-    }).catchError((e) {
-      print('Erro ao inicializar listener de autenticação: $e');
+      Logger.debug('Listener de autenticação inicializado com sucesso');
+    }).catchError((e, stackTrace) {
+      Logger.error('Erro ao inicializar listener de autenticação', e, stackTrace);
+      // Tentar novamente após um delay
+      Future.delayed(const Duration(seconds: 1), () {
+        if (!_listenerInitialized) {
+          _initializeAuthListener();
+        }
+      });
     });
   }
 
@@ -79,24 +94,35 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) {
     refreshListenable: appStateNotifier,
     navigatorKey: appNavigatorKey,
       redirect: (context, state) {
-        // Verificar se o usuário está autenticado
-        final isAuthenticated = SupabaseService.isAuthenticated;
-        final isLoginPage = state.uri.path == LoginWidget.routePath;
-        final isSignupPage = state.uri.path == SignupWidget.routePath;
-        final isAuthPage = isLoginPage || isSignupPage;
-        
-        // Se não está autenticado e não está em página de autenticação, redirecionar para login
-        if (!isAuthenticated && !isAuthPage) {
-          return LoginWidget.routePath;
+        try {
+          // Verificar se o usuário está autenticado
+          // Usar try-catch porque Supabase pode não estar inicializado ainda
+          final isAuthenticated = SupabaseService.isAuthenticated;
+          final isLoginPage = state.uri.path == LoginWidget.routePath;
+          final isSignupPage = state.uri.path == SignupWidget.routePath;
+          final isAuthPage = isLoginPage || isSignupPage;
+          
+          // Se não está autenticado e não está em página de autenticação, redirecionar para login
+          if (!isAuthenticated && !isAuthPage) {
+            return LoginWidget.routePath;
+          }
+          
+          // Se está autenticado e está em página de autenticação, redirecionar para home
+          if (isAuthenticated && isAuthPage) {
+            return '/';
+          }
+          
+          // Permitir acesso
+          return null;
+        } catch (e) {
+          // Se Supabase não está inicializado, permitir acesso à página de login
+          final isLoginPage = state.uri.path == LoginWidget.routePath;
+          final isSignupPage = state.uri.path == SignupWidget.routePath;
+          if (isLoginPage || isSignupPage) {
+            return null; // Permitir acesso às páginas de auth
+          }
+          return LoginWidget.routePath; // Redirecionar para login se não estiver em página de auth
         }
-        
-        // Se está autenticado e está em página de autenticação, redirecionar para home
-        if (isAuthenticated && isAuthPage) {
-          return '/';
-        }
-        
-        // Permitir acesso
-        return null;
       },
     errorBuilder: (context, state) => NavBarPage(),
     routes: [

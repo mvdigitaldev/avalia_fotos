@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../../services/supabase_service.dart';
 import '../../services/dashboard_service.dart';
 import '../../services/auth_service.dart';
+import '../../utils/logger.dart';
 import '../../models/dashboard_stats_model.dart';
 import '../../components/progress_bar_widget.dart';
 import '../photo_detail/photo_detail_widget.dart';
@@ -62,8 +63,8 @@ class _PainelWidgetState extends State<PainelWidget> {
       });
       
       _loadDashboardStats();
-    } catch (e) {
-      print('Erro ao inicializar serviços: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao inicializar serviços', e, stackTrace);
       safeSetState(() {
         _model.isLoading = false;
         _model.errorMessage = 'Erro ao inicializar serviços: $e';
@@ -91,8 +92,8 @@ class _PainelWidgetState extends State<PainelWidget> {
         _model.stats = stats;
         _model.isLoading = false;
       });
-    } catch (e) {
-      print('Erro ao carregar estatísticas: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao carregar estatísticas', e, stackTrace);
       safeSetState(() {
         _model.isLoading = false;
         _model.errorMessage = 'Erro ao carregar estatísticas: $e';

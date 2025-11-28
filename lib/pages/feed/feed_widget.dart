@@ -19,6 +19,7 @@ import '../../services/photo_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/photo_model.dart';
 import '../../models/comment_model.dart';
+import '../../utils/logger.dart';
 import 'feed_model.dart';
 export 'feed_model.dart';
 
@@ -85,8 +86,8 @@ class _FeedWidgetState extends State<FeedWidget> {
       });
       // Carregar feed após inicializar serviços
       _loadFeed();
-    } catch (e) {
-      print('Erro ao inicializar serviços: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao inicializar serviços', e, stackTrace);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Erro ao inicializar serviços: $e'),
@@ -98,7 +99,7 @@ class _FeedWidgetState extends State<FeedWidget> {
 
   Future<void> _loadFeed({bool refresh = false}) async {
     if (_model.isLoading || !_servicesInitialized) {
-      print('Feed não carregado: isLoading=${_model.isLoading}, servicesInitialized=$_servicesInitialized');
+      Logger.debug('Feed não carregado: isLoading=${_model.isLoading}, servicesInitialized=$_servicesInitialized');
       return;
     }
 
@@ -112,19 +113,13 @@ class _FeedWidgetState extends State<FeedWidget> {
     });
 
     try {
-      print('Carregando feed: page=${_model.currentPage}, offset=${_model.currentPage * _model.pageSize}');
+      Logger.debug('Carregando feed: page=${_model.currentPage}, offset=${_model.currentPage * _model.pageSize}');
       final newPhotos = await _photoService.getFeedPhotos(
         limit: _model.pageSize,
         offset: _model.currentPage * _model.pageSize,
       );
 
-      print('Fotos recebidas: ${newPhotos.length}');
-      for (final photo in newPhotos) {
-        print('Foto ID: ${photo.id}');
-        print('URL da imagem: ${photo.imageUrl}');
-        print('URL válida: ${photo.imageUrl.isNotEmpty}');
-        print('---');
-      }
+      Logger.debug('Fotos recebidas: ${newPhotos.length}');
 
       safeSetState(() {
         if (refresh) {
@@ -136,8 +131,8 @@ class _FeedWidgetState extends State<FeedWidget> {
         _model.currentPage++;
         _model.isLoading = false;
       });
-    } catch (e) {
-      print('Erro ao carregar feed: $e');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao carregar feed', e, stackTrace);
       safeSetState(() {
         _model.isLoading = false;
       });
@@ -274,8 +269,8 @@ class _FeedWidgetState extends State<FeedWidget> {
           _model.photos[index] = updatedPhoto;
         }
       });
-    } catch (e) {
-      print('Erro ao atualizar comentários: $e');
+    } catch (e, stackTrace) {
+      Logger.warning('Erro ao atualizar comentários', e, stackTrace);
     }
   }
 
@@ -375,8 +370,7 @@ class _FeedWidgetState extends State<FeedWidget> {
         ),
       ),
       errorWidget: (context, url, error) {
-        print('Erro ao carregar imagem no mobile: $url');
-        print('Erro: $error');
+        Logger.warning('Erro ao carregar imagem no mobile: $url', error);
         // Tentar Image.network como fallback
         return Image.network(
           url,
