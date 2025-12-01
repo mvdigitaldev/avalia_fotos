@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
+import 'notification_service.dart';
 import '../models/user_model.dart';
 import '../utils/logger.dart';
 import '../utils/error_handler.dart';
@@ -35,6 +36,16 @@ class AuthService {
 
       if (response.user == null) {
         throw Exception('Falha ao fazer login');
+      }
+
+      Logger.info('Login realizado com sucesso. Atualizando token de notificação...');
+      // Atualizar token de notificação
+      try {
+        await NotificationService().refreshToken();
+        Logger.info('Token de notificação atualizado após login.');
+      } catch (e) {
+        Logger.error('Erro ao atualizar token após login: $e');
+        // Não impedir o login se falhar
       }
 
       return await getCurrentUserProfile();
@@ -93,6 +104,12 @@ class AuthService {
       try {
         userProfile = await getCurrentUserProfile();
         if (userProfile != null) {
+          // Atualizar token de notificação
+          try {
+            await NotificationService().refreshToken();
+          } catch (e) {
+            Logger.warning('Erro ao atualizar token de notificação após cadastro', e);
+          }
           return userProfile;
         }
       } catch (e, stackTrace) {
@@ -141,6 +158,12 @@ class AuthService {
         userProfile = await getCurrentUserProfile();
         
         if (userProfile != null) {
+          // Atualizar token de notificação
+          try {
+            await NotificationService().refreshToken();
+          } catch (e) {
+            Logger.warning('Erro ao atualizar token de notificação após cadastro (fallback)', e);
+          }
           return userProfile;
         }
 
@@ -169,6 +192,12 @@ class AuthService {
           userProfile = await getCurrentUserProfile();
           
           if (userProfile != null) {
+            // Atualizar token de notificação
+            try {
+              await NotificationService().refreshToken();
+            } catch (e) {
+              Logger.warning('Erro ao atualizar token de notificação após cadastro (direct)', e);
+            }
             return userProfile;
           }
         } catch (insertError, stackTrace) {
@@ -190,6 +219,17 @@ class AuthService {
 
   Future<void> signOut() async {
     try {
+      // Remover token de notificação antes de fazer logout
+      try {
+        final notificationService = NotificationService();
+        if (notificationService.isInitialized) {
+          await notificationService.removeToken();
+        }
+      } catch (e) {
+        Logger.debug('Erro ao remover token de notificação no logout', e);
+        // Continuar mesmo se houver erro ao remover token
+      }
+      
       await _client.auth.signOut();
     } catch (e) {
       throw _handleError(e);

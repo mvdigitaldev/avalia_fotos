@@ -10,7 +10,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '/flutter_flow/nav/nav.dart';
 import '../services/supabase_service.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import '../utils/logger.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'login_model.dart';
 export 'login_model.dart';
 
@@ -112,6 +114,30 @@ class _LoginWidgetState extends State<LoginWidget> {
         email: _model.textController1!.text.trim(),
         password: _model.textController2!.text,
       );
+
+      // Após login bem-sucedido, garantir que o token FCM seja salvo
+      if (!kIsWeb && mounted) {
+        try {
+          Logger.info('Login bem-sucedido, salvando token FCM...');
+          final notificationService = NotificationService();
+          
+          // Aguardar um pouco para garantir que a sessão está sincronizada
+          await Future.delayed(const Duration(milliseconds: 1000));
+          
+          if (notificationService.isInitialized) {
+            await notificationService.refreshToken();
+            Logger.info('Token FCM salvo após login bem-sucedido');
+          } else {
+            Logger.info('NotificationService não inicializado, inicializando agora...');
+            await notificationService.initialize();
+            await Future.delayed(const Duration(milliseconds: 500));
+            await notificationService.refreshToken();
+          }
+        } catch (e, stackTrace) {
+          Logger.error('Erro ao salvar token após login', e, stackTrace);
+          // Não bloquear o login se houver erro ao salvar token
+        }
+      }
 
       if (mounted) {
         // O router vai redirecionar automaticamente devido ao redirect

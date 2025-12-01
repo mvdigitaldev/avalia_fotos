@@ -10,7 +10,11 @@ import '/flutter_flow/flutter_flow_util.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '/flutter_flow/nav/nav.dart';
 import '/services/supabase_service.dart';
+import '/services/notification_service.dart';
+import '/services/route_tracker_service.dart';
 import '/utils/logger.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'index.dart';
 
 void main() async {
@@ -36,6 +40,18 @@ void main() async {
   }
 
   await FlutterFlowTheme.initialize();
+
+  // Inicializar Firebase antes de tudo
+  if (!kIsWeb) {
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      Logger.info('Firebase inicializado com sucesso no main()');
+    } catch (e, stackTrace) {
+      Logger.error('Erro crítico ao inicializar Firebase no main()', e, stackTrace);
+    }
+  }
   
   // Inicializar Supabase ANTES de criar o app
   // Isso é crítico porque o router e AppStateNotifier dependem do Supabase
@@ -53,6 +69,10 @@ void main() async {
       // Continuar mesmo assim - o fallback deve funcionar
     }
   }
+
+  // Inicializar NotificationService foi movido para MyApp.initState
+  // para garantir que o contexto esteja pronto (embora não seja estritamente necessário para Firebase,
+  // ajuda com permissões e notificações locais em alguns casos)
 
   runApp(MyApp());
 }
@@ -90,6 +110,26 @@ class _MyAppState extends State<MyApp> {
 
     _appStateNotifier = AppStateNotifier.instance;
     _router = createRouter(_appStateNotifier);
+    
+    // Inicializar RouteTrackerService com o router
+    RouteTrackerService().initializeWithRouter(_router);
+
+    // Inicializar NotificationService
+    if (!kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _initNotifications();
+      });
+    }
+  }
+
+  Future<void> _initNotifications() async {
+    try {
+      Logger.info('Inicializando NotificationService no MyApp...');
+      await NotificationService().initialize();
+      Logger.info('NotificationService inicializado');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao inicializar NotificationService', e, stackTrace);
+    }
   }
 
   void setThemeMode(ThemeMode mode) => safeSetState(() {

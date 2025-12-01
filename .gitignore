@@ -52,3 +52,6 @@ app.*.map.json
 .env
 .env.local
 .env.*.local
+
+# Firebase Service Account Keys
+*-firebase-adminsdk-*.json

@@ -13,7 +13,9 @@ import '/flutter_flow/place.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'serialization_util.dart';
 import '/services/supabase_service.dart';
+import '/services/notification_service.dart';
 import '/utils/logger.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '/index.dart';
 
@@ -59,9 +61,65 @@ class AppStateNotifier extends ChangeNotifier {
     SupabaseService.getInstance().then((service) {
       if (_listenerInitialized) return; // Verificar novamente após await
       _listenerInitialized = true;
-      _authSubscription = service.authStateChanges.listen((authState) {
+      _authSubscription = service.authStateChanges.listen((authState) async {
         // Notificar listeners quando o estado de autenticação mudar
         notifyListeners();
+        
+        // Gerenciar token de notificação quando usuário faz login/logout
+        if (!kIsWeb) {
+          try {
+            final notificationService = NotificationService();
+            if (authState.session != null) {
+              // Usuário fez login - garantir que token está salvo
+              Logger.info('=== USUÁRIO FEZ LOGIN ===');
+              Logger.info('User ID: ${authState.session?.user.id}');
+              
+              // Aguardar um pouco para garantir que tudo está sincronizado
+              await Future.delayed(const Duration(milliseconds: 1500));
+              
+              try {
+                Logger.info('Verificando se NotificationService está inicializado...');
+                if (!notificationService.isInitialized) {
+                  // Se não estiver inicializado, inicializar agora
+                  Logger.info('NotificationService não estava inicializado, inicializando agora...');
+                  await notificationService.initialize();
+                  Logger.info('NotificationService inicializado após login');
+                  
+                  // Aguardar mais um pouco após inicialização
+                  await Future.delayed(const Duration(milliseconds: 1000));
+                }
+                
+                Logger.info('Chamando refreshToken para salvar token FCM...');
+                await notificationService.refreshToken();
+                Logger.info('=== TOKEN FCM SALVO APÓS LOGIN ===');
+              } catch (e, stackTrace) {
+                Logger.error('=== ERRO AO SALVAR TOKEN APÓS LOGIN ===');
+                Logger.error('Erro: ${e.toString()}');
+                Logger.error('Stack trace: $stackTrace');
+                
+                // Tentar novamente após um delay maior
+                Logger.info('Tentando novamente após 5 segundos...');
+                await Future.delayed(const Duration(seconds: 5));
+                try {
+                  if (!notificationService.isInitialized) {
+                    await notificationService.initialize();
+                  }
+                  await notificationService.refreshToken();
+                } catch (e2) {
+                  Logger.error('Falha na segunda tentativa: ${e2.toString()}');
+                }
+              }
+            } else {
+              // Usuário fez logout - remover token
+              if (notificationService.isInitialized) {
+                await notificationService.removeToken();
+              }
+            }
+          } catch (e) {
+            Logger.debug('Erro ao gerenciar token de notificação', e);
+            // Não bloquear o fluxo se houver erro
+          }
+        }
       });
       Logger.debug('Listener de autenticação inicializado com sucesso');
     }).catchError((e, stackTrace) {
