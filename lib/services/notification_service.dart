@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -25,6 +26,9 @@ class NotificationService {
   
   bool _initialized = false;
   String? _currentToken;
+  StreamSubscription<RemoteMessage>? _foregroundSubscription;
+  StreamSubscription<RemoteMessage>? _backgroundSubscription;
+  final Set<String> _processedMessages = {};
 
   /// Inicializa o serviço de notificações
   Future<void> initialize() async {
@@ -199,11 +203,15 @@ class NotificationService {
 
   /// Configura handlers para mensagens
   Future<void> _setupMessageHandlers() async {
+    // Cancelar subscriptions anteriores se existirem para evitar duplicação
+    await _foregroundSubscription?.cancel();
+    await _backgroundSubscription?.cancel();
+    
     // Handler para mensagens em foreground
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+    _foregroundSubscription = FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
 
     // Handler para mensagens em background (quando app está em background)
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleBackgroundMessage);
+    _backgroundSubscription = FirebaseMessaging.onMessageOpenedApp.listen(_handleBackgroundMessage);
 
     // Handler para mensagens quando app é aberto a partir de notificação
     final initialMessage = await _firebaseMessaging.getInitialMessage();
@@ -211,7 +219,7 @@ class NotificationService {
       _handleBackgroundMessage(initialMessage);
     }
 
-    // Configurar handler global para background
+    // Configurar handler global para background (apenas uma vez)
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   }
 
@@ -348,7 +356,23 @@ class NotificationService {
 
   /// Handle mensagens em foreground
   void _handleForegroundMessage(RemoteMessage message) {
-    Logger.info('Mensagem recebida em foreground: ${message.messageId}');
+    final messageId = message.messageId ?? message.hashCode.toString();
+    
+    // Evitar processar a mesma mensagem duas vezes
+    if (_processedMessages.contains(messageId)) {
+      Logger.warning('Mensagem duplicada ignorada: $messageId');
+      return;
+    }
+    
+    _processedMessages.add(messageId);
+    
+    // Limpar mensagens antigas (manter apenas as últimas 100)
+    if (_processedMessages.length > 100) {
+      final toRemove = _processedMessages.take(_processedMessages.length - 100).toList();
+      _processedMessages.removeAll(toRemove);
+    }
+    
+    Logger.info('Mensagem recebida em foreground: $messageId');
     
     // Mostrar notificação local quando app está em foreground
     _showLocalNotification(message);
