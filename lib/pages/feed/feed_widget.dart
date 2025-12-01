@@ -341,16 +341,16 @@ class _FeedWidgetState extends State<FeedWidget> {
     return CachedNetworkImage(
       imageUrl: photo.imageUrl,
       width: double.infinity,
-      height: MediaQuery.sizeOf(context).height * 0.5,
-      fit: BoxFit.cover,
+      // Altura removida para respeitar a proporção da imagem
+      fit: BoxFit.fitWidth,
       cacheManager: _photoCacheManager,
       memCacheWidth: (MediaQuery.sizeOf(context).width * 2).toInt(),
-      memCacheHeight: (MediaQuery.sizeOf(context).height * 0.5 * 2).toInt(),
+      // memCacheHeight removido para não distorcer ao redimensionar
       fadeInDuration: const Duration(milliseconds: 300),
       fadeOutDuration: const Duration(milliseconds: 100),
       placeholder: (context, url) => Container(
         width: double.infinity,
-        height: MediaQuery.sizeOf(context).height * 0.5,
+        height: MediaQuery.sizeOf(context).height * 0.5, // Altura fixa apenas para o placeholder
         decoration: BoxDecoration(
           color: FlutterFlowTheme.of(context).alternate,
           gradient: LinearGradient(
@@ -375,8 +375,8 @@ class _FeedWidgetState extends State<FeedWidget> {
         return Image.network(
           url,
           width: double.infinity,
-          height: MediaQuery.sizeOf(context).height * 0.5,
-          fit: BoxFit.cover,
+          // Altura removida
+          fit: BoxFit.fitWidth,
           errorBuilder: (context, error, stackTrace) {
             return Container(
               width: double.infinity,

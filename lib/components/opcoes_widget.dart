@@ -11,6 +11,7 @@ import 'package:intl/intl.dart';
 import '../../main.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/logger.dart';
+import '../../services/notification_service.dart';
 import 'opcoes_model.dart';
 export 'opcoes_model.dart';
 
@@ -29,6 +30,7 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
   bool habilitarPlanos = false;
   bool isLoadingPlan = true;
   bool isFreePlan = false;
+  int _unreadCount = 0;
 
   @override
   void setState(VoidCallback callback) {
@@ -41,6 +43,20 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
     super.initState();
     _model = createModel(context, () => OpcoesModel());
     _loadPlanInfo();
+    _loadUnreadCount();
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final count = await NotificationService().getUnreadCount();
+      if (mounted) {
+        setState(() {
+          _unreadCount = count;
+        });
+      }
+    } catch (e) {
+      Logger.error('Erro ao carregar contagem de notificações', e);
+    }
   }
 
   Future<void> _loadPlanInfo() async {
@@ -200,6 +216,96 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                                 4.0, 0.0, 0.0, 0.0),
                             child: Text(
                               'Perfil',
+                              style: FlutterFlowTheme.of(context)
+                                  .bodyMedium
+                                  .override(
+                                    font: GoogleFonts.poppins(
+                                      fontWeight: FlutterFlowTheme.of(context)
+                                          .bodyMedium
+                                          .fontWeight,
+                                      fontStyle: FlutterFlowTheme.of(context)
+                                          .bodyMedium
+                                          .fontStyle,
+                                    ),
+                                    letterSpacing: 0.0,
+                                    fontWeight: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .fontWeight,
+                                    fontStyle: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .fontStyle,
+                                  ),
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_right_sharp,
+                          color: FlutterFlowTheme.of(context).primary,
+                          size: 24.0,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 8.0),
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).pop(); // Fechar drawer
+                  context.push('/notifications');
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Color(0x11868686),
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 8.0),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.max,
+                      children: [
+                        Stack(
+                          children: [
+                            Icon(
+                              Icons.notifications_outlined,
+                              color: FlutterFlowTheme.of(context).primary,
+                              size: 24.0,
+                            ),
+                            if (_unreadCount > 0)
+                              Positioned(
+                                right: 0,
+                                top: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 12,
+                                    minHeight: 12,
+                                  ),
+                                  child: Text(
+                                    '$_unreadCount',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsetsDirectional.fromSTEB(
+                                4.0, 0.0, 0.0, 0.0),
+                            child: Text(
+                              'Notificações',
                               style: FlutterFlowTheme.of(context)
                                   .bodyMedium
                                   .override(

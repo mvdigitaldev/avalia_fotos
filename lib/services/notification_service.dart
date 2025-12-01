@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // Added import
 import '../firebase_options.dart';
 import 'supabase_service.dart';
 import '../utils/logger.dart';
@@ -537,6 +538,118 @@ class NotificationService {
         Logger.warning('O token não pôde ser obtido. Isso pode acontecer em simuladores iOS.');
         Logger.warning('Teste em um dispositivo físico para garantir que as notificações funcionem corretamente.');
       }
+    }
+  }
+
+  /// Obtém as notificações do usuário
+  Future<List<Map<String, dynamic>>> getNotifications({int limit = 20, int offset = 0}) async {
+    try {
+      final supabaseService = await SupabaseService.getInstance();
+      final client = supabaseService.client;
+      final userId = supabaseService.currentUser?.id;
+
+      if (userId == null) {
+        Logger.warning('getNotifications: Usuário não autenticado');
+        return [];
+      }
+
+      Logger.info('Buscando notificações para o usuário: $userId');
+
+      final response = await client
+          .from('notifications')
+          .select('''
+            *,
+            actor:users!notifications_actor_id_fkey (username, avatar_url),
+            photo:photos!notifications_resource_id_fkey (image_url, thumbnail_url),
+            comment_details:comments!notifications_comment_id_fkey (content)
+          ''')
+          .eq('user_id', userId)
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      Logger.info('Notificações encontradas: ${response.length}');
+      if (response.isNotEmpty) {
+        Logger.debug('Primeira notificação (raw): ${response.first}');
+      }
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao buscar notificações', e, stackTrace);
+      return [];
+    }
+  }
+
+  /// Marca uma notificação como lida
+  Future<void> markAsRead(String notificationId) async {
+    try {
+      final supabaseService = await SupabaseService.getInstance();
+      final client = supabaseService.client;
+
+      await client
+          .from('notifications')
+          .update({'is_read': true})
+          .eq('id', notificationId);
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao marcar notificação como lida', e, stackTrace);
+    }
+  }
+
+  /// Marca todas as notificações como lidas
+  Future<void> markAllAsRead() async {
+    try {
+      final supabaseService = await SupabaseService.getInstance();
+      final client = supabaseService.client;
+      final userId = supabaseService.currentUser?.id;
+
+      if (userId == null) return;
+
+      await client
+          .from('notifications')
+          .update({'is_read': true})
+          .eq('user_id', userId)
+          .eq('is_read', false);
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao marcar todas notificações como lidas', e, stackTrace);
+    }
+  }
+
+  /// Limpa todas as notificações do usuário
+  Future<void> clearNotifications() async {
+    try {
+      final supabaseService = await SupabaseService.getInstance();
+      final client = supabaseService.client;
+      final userId = supabaseService.currentUser?.id;
+
+      if (userId == null) return;
+
+      await client
+          .from('notifications')
+          .delete()
+          .eq('user_id', userId);
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao limpar notificações', e, stackTrace);
+    }
+  }
+
+  /// Obtém a contagem de notificações não lidas
+  Future<int> getUnreadCount() async {
+    try {
+      final supabaseService = await SupabaseService.getInstance();
+      final client = supabaseService.client;
+      final userId = supabaseService.currentUser?.id;
+
+      if (userId == null) return 0;
+
+      final count = await client
+          .from('notifications')
+          .count(CountOption.exact)
+          .eq('user_id', userId)
+          .eq('is_read', false);
+
+      return count;
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao buscar contagem de notificações', e, stackTrace);
+      return 0;
     }
   }
 }

@@ -31,6 +31,8 @@ import '/signup/signup_widget.dart';
 import '/pages/conquistas/conquistas_widget.dart';
 // Import InspirarWidget explicitly
 import '/pages/inspirar/inspirar_widget.dart';
+// Import NotificationsPage explicitly
+import '/pages/notifications/notifications_page.dart';
 
 export 'package:go_router/go_router.dart';
 export 'serialization_util.dart';
@@ -276,7 +278,13 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) {
         path: InspirarWidget.routePath,
         requireAuth: true,
         builder: (context, params) => InspirarWidget(),
-      )
+      ),
+      FFRoute(
+        name: NotificationsPage.routeName,
+        path: NotificationsPage.routePath,
+        requireAuth: true,
+        builder: (context, params) => NotificationsPage(),
+      ),
     ].map((r) => r.toRoute(appStateNotifier)).toList(),
   );
 }
