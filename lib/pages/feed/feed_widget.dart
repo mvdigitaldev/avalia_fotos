@@ -246,15 +246,20 @@ class _FeedWidgetState extends State<FeedWidget> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _CommentsBottomSheet(
-        photo: photo,
-        initialComments: commentModels,
-        photoService: _photoService,
-        currentUserId: currentUserId,
-        onCommentAdded: () {
-          // Recarregar comentários e atualizar contador
-          _refreshPhotoComments(photo.id);
-        },
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: _CommentsBottomSheet(
+          photo: photo,
+          initialComments: commentModels,
+          photoService: _photoService,
+          currentUserId: currentUserId,
+          onCommentAdded: () {
+            // Recarregar comentários e atualizar contador
+            _refreshPhotoComments(photo.id);
+          },
+        ),
       ),
     );
   }
@@ -1062,9 +1067,14 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
 
   bool _canDeleteComment(CommentModel comment) {
     // Pode deletar se for o dono da foto ou o autor do comentário
-    return widget.currentUserId != null &&
+    final canDelete = widget.currentUserId != null &&
         (widget.currentUserId == widget.photo.userId ||
             widget.currentUserId == comment.userId);
+    
+    // Log para debug
+    Logger.debug('_canDeleteComment: currentUserId=${widget.currentUserId}, photo.userId=${widget.photo.userId}, comment.userId=${comment.userId}, canDelete=$canDelete');
+    
+    return canDelete;
   }
 
   String _formatTimeAgo(DateTime dateTime) {
@@ -1088,8 +1098,15 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final maxHeight = screenHeight * 0.9; // Máximo de 90% da tela
+    final baseHeight = screenHeight * 0.75;
+    // Ajustar altura considerando o teclado, mas não ultrapassar 90% da tela
+    final containerHeight = (baseHeight + keyboardHeight).clamp(0.0, maxHeight);
+    
     return Container(
-      height: MediaQuery.of(context).size.height * 0.75,
+      height: containerHeight,
       decoration: BoxDecoration(
         color: FlutterFlowTheme.of(context).secondaryBackground,
         borderRadius: const BorderRadius.only(
@@ -1269,7 +1286,12 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
           ),
           // Campo de input para novo comentário
           Container(
-            padding: const EdgeInsetsDirectional.fromSTEB(20, 12, 20, 20),
+            padding: EdgeInsetsDirectional.fromSTEB(
+              20, 
+              12, 
+              20, 
+              20 + MediaQuery.of(context).viewInsets.bottom,
+            ),
             decoration: BoxDecoration(
               color: FlutterFlowTheme.of(context).primaryBackground,
               border: Border(

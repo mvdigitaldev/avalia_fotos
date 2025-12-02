@@ -88,9 +88,33 @@ async function getAccessToken(serviceAccount) {
   return data.access_token;
 }
 
+// Função para converter todos os valores do objeto data para strings (requisito do FCM)
+function convertDataToStrings(data: Record<string, any>): Record<string, string> {
+  const converted: Record<string, string> = {};
+  for (const [key, value] of Object.entries(data)) {
+    // Converter para string: null/undefined vira string vazia, boolean vira "true"/"false", etc
+    if (value === null || value === undefined) {
+      converted[key] = '';
+    } else if (typeof value === 'boolean') {
+      converted[key] = value ? 'true' : 'false';
+    } else if (typeof value === 'number') {
+      converted[key] = value.toString();
+    } else if (typeof value === 'object') {
+      // Se for objeto ou array, converter para JSON string
+      converted[key] = JSON.stringify(value);
+    } else {
+      converted[key] = String(value);
+    }
+  }
+  return converted;
+}
+
 // Função para enviar notificação via FCM HTTP v1 API
 async function sendFCMNotification(accessToken, projectId, token, title, body, data = {}) {
   const url = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
+  
+  // Converter todos os valores de data para strings (requisito do FCM)
+  const dataAsStrings = convertDataToStrings(data);
   
   const message = {
     message: {
@@ -99,7 +123,7 @@ async function sendFCMNotification(accessToken, projectId, token, title, body, d
         title: title,
         body: body,
       },
-      data: data,
+      data: dataAsStrings,
     }
   };
 
