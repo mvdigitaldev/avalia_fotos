@@ -7,9 +7,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io';
 import '../../services/supabase_service.dart';
 import '../../services/plan_service.dart';
 import '../../services/payment_service.dart';
+import '../../services/in_app_purchase_service.dart';
 import '../../utils/logger.dart';
 import '../../models/plan_model.dart';
 import '../../models/user_plan_model.dart';
@@ -33,7 +36,10 @@ class _PlansWidgetState extends State<PlansWidget> with TickerProviderStateMixin
   final scaffoldKey = GlobalKey<ScaffoldState>();
   late PlanService _planService;
   late PaymentService _paymentService;
+  InAppPurchaseService? _iapService;
   bool _servicesInitialized = false;
+  bool _isPurchasing = false;
+  final Map<String, String> _productPrices = {}; // Map de productId -> preço formatado
 
   @override
   void initState() {
@@ -55,6 +61,21 @@ class _PlansWidgetState extends State<PlansWidget> with TickerProviderStateMixin
       final supabaseService = await SupabaseService.getInstance();
       _planService = PlanService(supabaseService);
       _paymentService = PaymentService(supabaseService);
+      
+      // Inicializar In-App Purchase apenas em plataformas móveis
+      if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
+        Logger.info('Inicializando In-App Purchase Service...');
+        Logger.debug('Plataforma: ${Platform.isIOS ? "iOS" : "Android"}');
+        _iapService = InAppPurchaseService(supabaseService);
+        await _iapService!.initialize();
+        Logger.info('In-App Purchase Service inicializado. Disponível: ${_iapService!.isAvailable}');
+        if (!_iapService!.isAvailable) {
+          Logger.warning('In-App Purchase não está disponível nesta plataforma/simulador');
+        }
+      } else {
+        Logger.info('In-App Purchase não será inicializado (plataforma: ${kIsWeb ? "Web" : "Desktop"})');
+      }
+      
       setState(() {
         _servicesInitialized = true;
       });
@@ -108,6 +129,28 @@ class _PlansWidgetState extends State<PlansWidget> with TickerProviderStateMixin
       // Filtrar plano Free da lista (usuários não podem migrar para Free)
       final paidPlans = plans.where((plan) => plan.name.toLowerCase() != 'free').toList();
 
+      // Log dos planos carregados e seus Product IDs
+      Logger.info('Planos carregados: ${paidPlans.length}');
+      for (final plan in paidPlans) {
+        final productId = plan.getProductIdForPlatform();
+        Logger.debug('Plano: ${plan.name} - Product ID (${Platform.isIOS ? "iOS" : "Android"}): ${productId ?? "NÃO CONFIGURADO"}');
+        Logger.debug('  apple_product_id: ${plan.appleProductId ?? "null"}');
+        Logger.debug('  google_product_id: ${plan.googleProductId ?? "null"}');
+        Logger.debug('  hasProductIdForCurrentPlatform: ${plan.hasProductIdForCurrentPlatform()}');
+      }
+
+      // Carregar produtos do store se IAP estiver disponível
+      if (_iapService != null && _iapService!.isAvailable) {
+        Logger.info('Carregando produtos do store...');
+        await _loadStoreProducts(paidPlans);
+      } else {
+        Logger.warning('IAP Service não disponível - produtos do store não serão carregados');
+        Logger.debug('  _iapService == null: ${_iapService == null}');
+        if (_iapService != null) {
+          Logger.debug('  _iapService.isAvailable: ${_iapService!.isAvailable}');
+        }
+      }
+
       safeSetState(() {
         _model.availablePlans = paidPlans;
         _model.currentPlan = currentPlan;
@@ -121,6 +164,236 @@ class _PlansWidgetState extends State<PlansWidget> with TickerProviderStateMixin
     }
   }
 
+  /// Carrega produtos do store (Apple/Google)
+  Future<void> _loadStoreProducts(List<PlanModel> plans) async {
+    if (_iapService == null || !_iapService!.isAvailable) {
+      Logger.warning('_loadStoreProducts: IAP Service não disponível');
+      return;
+    }
+
+    try {
+      // Coletar todos os product IDs das plataformas
+      final productIds = <String>[];
+      for (final plan in plans) {
+        final productId = plan.getProductIdForPlatform();
+        if (productId != null && productId.isNotEmpty) {
+          productIds.add(productId);
+        }
+      }
+
+      Logger.info('Product IDs coletados para buscar no store: ${productIds.length}');
+      Logger.debug('Product IDs: $productIds');
+
+      if (productIds.isEmpty) {
+        Logger.warning('Nenhum Product ID válido encontrado nos planos');
+        return;
+      }
+
+      // Buscar produtos do store
+      Logger.info('Buscando produtos no store...');
+      final products = await _iapService!.getAvailableProducts(productIds);
+      Logger.info('Produtos encontrados no store: ${products.length}');
+
+      // Armazenar preços formatados
+      for (final entry in products.entries) {
+        _productPrices[entry.key] = entry.value.price;
+        Logger.debug('Produto encontrado: ${entry.key} - Preço: ${entry.value.price}');
+      }
+
+      if (products.isEmpty) {
+        Logger.warning('Nenhum produto foi encontrado no store para os Product IDs fornecidos');
+      }
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao carregar produtos do store', e, stackTrace);
+    }
+  }
+
+  /// Compra um plano via In-App Purchase
+  Future<void> _purchasePlan(PlanModel plan) async {
+    Logger.info('_purchasePlan chamado para plano: ${plan.name}');
+    Logger.debug('Verificando condições para IAP...');
+    Logger.debug('  _iapService == null: ${_iapService == null}');
+    if (_iapService != null) {
+      Logger.debug('  _iapService.isAvailable: ${_iapService!.isAvailable}');
+    }
+    Logger.debug('  plan.hasProductIdForCurrentPlatform(): ${plan.hasProductIdForCurrentPlatform()}');
+    Logger.debug('  Platform.isIOS: ${Platform.isIOS}');
+    Logger.debug('  Platform.isAndroid: ${Platform.isAndroid}');
+    Logger.debug('  plan.appleProductId: ${plan.appleProductId ?? "null"}');
+    Logger.debug('  plan.googleProductId: ${plan.googleProductId ?? "null"}');
+
+    // Verificar condições e logar qual está falhando
+    if (_iapService == null) {
+      Logger.warning('IAP Service não inicializado - usando fallback para link externo');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('In-App Purchase não está disponível. Redirecionando para página externa...'),
+            backgroundColor: FlutterFlowTheme.of(context).secondary,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      await _openPlanLink(plan.linkPlan);
+      return;
+    }
+
+    if (!_iapService!.isAvailable) {
+      Logger.warning('IAP Service não está disponível nesta plataforma/simulador - usando fallback para link externo');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('In-App Purchase não está disponível no simulador. Redirecionando para página externa...'),
+            backgroundColor: FlutterFlowTheme.of(context).secondary,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      await _openPlanLink(plan.linkPlan);
+      return;
+    }
+
+    if (!plan.hasProductIdForCurrentPlatform()) {
+      Logger.warning('Product ID não configurado para este plano na plataforma atual - usando fallback para link externo');
+      Logger.debug('Plano: ${plan.name}, Platform: ${Platform.isIOS ? "iOS" : "Android"}');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Product ID não configurado para este plano. Redirecionando para página externa...'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      await _openPlanLink(plan.linkPlan);
+      return;
+    }
+
+    final productId = plan.getProductIdForPlatform();
+    Logger.info('Product ID obtido: $productId');
+    
+    if (productId == null || productId.isEmpty) {
+      Logger.error('Product ID é null ou vazio mesmo após verificação');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Product ID não configurado para este plano'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (_isPurchasing) {
+      Logger.warning('Já existe uma compra em andamento');
+      return; // Evitar múltiplas compras simultâneas
+    }
+
+    safeSetState(() {
+      _isPurchasing = true;
+    });
+
+    try {
+      Logger.info('Iniciando compra do produto: $productId');
+      
+      // Verificar se o produto foi carregado do store
+      final productDetails = _iapService!.getProductDetails(productId);
+      if (productDetails == null) {
+        Logger.warning('Produto não foi carregado do store. Tentando carregar agora...');
+        // Tentar carregar produtos do store antes de comprar
+        final plansWithThisProduct = _model.availablePlans.where((p) => p.getProductIdForPlatform() == productId).toList();
+        if (plansWithThisProduct.isNotEmpty) {
+          await _loadStoreProducts(plansWithThisProduct);
+          // Verificar novamente
+          final productDetailsAfterLoad = _iapService!.getProductDetails(productId);
+          if (productDetailsAfterLoad == null) {
+            throw Exception('Produto não encontrado no App Store. Verifique se o Product ID está configurado corretamente no App Store Connect.');
+          }
+        } else {
+          throw Exception('Produto não encontrado. Verifique se o Product ID está configurado corretamente.');
+        }
+      }
+      
+      final success = await _iapService!.buySubscription(productId);
+      Logger.info('Resultado da compra iniciada: $success');
+      
+      if (!success) {
+        throw Exception('Não foi possível iniciar a compra. O produto pode não estar disponível no App Store Connect ou o In-App Purchase não está configurado corretamente.');
+      }
+
+      Logger.info('Compra iniciada com sucesso - aguardando confirmação do store');
+      // A compra será processada pelo listener no serviço
+      // A UI será atualizada quando a validação for concluída
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao comprar plano', e, stackTrace);
+      if (mounted) {
+        String errorMessage = 'Erro ao iniciar compra';
+        if (e.toString().contains('Product ID')) {
+          errorMessage = 'Product ID não encontrado. Verifique se está configurado no App Store Connect.';
+        } else if (e.toString().contains('App Store')) {
+          errorMessage = 'Produto não encontrado no App Store. Verifique a configuração.';
+        } else {
+          errorMessage = 'Não foi possível iniciar a compra. ${e.toString()}';
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      safeSetState(() {
+        _isPurchasing = false;
+      });
+    }
+  }
+
+  /// Restaura compras anteriores
+  Future<void> _restorePurchases() async {
+    if (_iapService == null || !_iapService!.isAvailable) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('In-App Purchase não está disponível'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      await _iapService!.restorePurchases();
+      
+      // Recarregar planos após restaurar
+      await _loadPlans();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Compras restauradas com sucesso'),
+            backgroundColor: FlutterFlowTheme.of(context).success,
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao restaurar compras', e, stackTrace);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao restaurar compras: ${e.toString()}'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Fallback: Abre link externo do plano
   Future<void> _openPlanLink(String? linkPlan) async {
     if (linkPlan == null || linkPlan.isEmpty) {
       if (mounted) {
@@ -240,7 +513,7 @@ class _PlansWidgetState extends State<PlansWidget> with TickerProviderStateMixin
               child: Text(
                 plan.isFree
                     ? 'Grátis'
-                    : 'R\$ ${plan.price!.toStringAsFixed(2)}/mês',
+                    : _getPlanPrice(plan),
                 style: FlutterFlowTheme.of(context).headlineMedium.override(
                       font: GoogleFonts.poppins(
                         fontWeight: FontWeight.bold,
@@ -270,14 +543,16 @@ class _PlansWidgetState extends State<PlansWidget> with TickerProviderStateMixin
             ),
             if (!isCurrentPlan)
               FFButtonWidget(
-                onPressed: () => _openPlanLink(plan.linkPlan),
-                text: 'Escolher Plano',
+                onPressed: _isPurchasing ? null : () => _purchasePlan(plan),
+                text: _isPurchasing ? 'Processando...' : 'Escolher Plano',
                 options: FFButtonOptions(
                   width: double.infinity,
                   height: 50,
                   padding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 0),
                   iconPadding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 0),
-                  color: FlutterFlowTheme.of(context).primary,
+                  color: _isPurchasing 
+                      ? FlutterFlowTheme.of(context).secondary 
+                      : FlutterFlowTheme.of(context).primary,
                   textStyle: FlutterFlowTheme.of(context).titleSmall.override(
                         font: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600,
@@ -293,6 +568,26 @@ class _PlansWidgetState extends State<PlansWidget> with TickerProviderStateMixin
         ),
       ),
     );
+  }
+
+  /// Obtém o preço do plano (do store se disponível, senão do banco)
+  String _getPlanPrice(PlanModel plan) {
+    if (plan.isFree) {
+      return 'Grátis';
+    }
+
+    // Tentar obter preço do store primeiro
+    final productId = plan.getProductIdForPlatform();
+    if (productId != null && _productPrices.containsKey(productId)) {
+      return _productPrices[productId]!;
+    }
+
+    // Fallback para preço do banco
+    if (plan.price != null) {
+      return 'R\$ ${plan.price!.toStringAsFixed(2)}/mês';
+    }
+
+    return 'Preço não disponível';
   }
 
   Widget _buildFeatureRow(String text) {
@@ -698,6 +993,7 @@ class _PlansWidgetState extends State<PlansWidget> with TickerProviderStateMixin
 
   @override
   void dispose() {
+    _iapService?.dispose();
     _model.dispose();
     super.dispose();
   }
@@ -713,6 +1009,15 @@ class _PlansWidgetState extends State<PlansWidget> with TickerProviderStateMixin
         key: scaffoldKey,
         backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
         appBar: AppBar(
+          actions: [
+            // Botão de restaurar compras (apenas em plataformas móveis com IAP)
+            if (_iapService != null && _iapService!.isAvailable)
+              IconButton(
+                icon: Icon(Icons.restore),
+                tooltip: 'Restaurar Compras',
+                onPressed: _restorePurchases,
+              ),
+          ],
           backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
           automaticallyImplyLeading: true,
           leading: IconButton(
@@ -732,7 +1037,6 @@ class _PlansWidgetState extends State<PlansWidget> with TickerProviderStateMixin
                   letterSpacing: 0.0,
                 ),
           ),
-          actions: [],
           centerTitle: false,
           elevation: 0.0,
           bottom: _model.tabController != null

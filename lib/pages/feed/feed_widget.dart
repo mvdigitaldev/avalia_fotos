@@ -1,4 +1,5 @@
 import '/components/opcoes_widget.dart';
+import '/components/share_bottom_sheet.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -17,8 +18,11 @@ import 'package:go_router/go_router.dart';
 import '../../services/supabase_service.dart';
 import '../../services/photo_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/report_service.dart';
+import '../../services/content_moderation_service.dart';
 import '../../models/photo_model.dart';
 import '../../models/comment_model.dart';
+import '../../models/report_model.dart';
 import '../../utils/logger.dart';
 import 'feed_model.dart';
 export 'feed_model.dart';
@@ -39,6 +43,7 @@ class _FeedWidgetState extends State<FeedWidget> {
   final scaffoldKey = GlobalKey<ScaffoldState>();
   late PhotoService _photoService;
   late AuthService _authService;
+  ReportService? _reportService;
   bool _servicesInitialized = false;
   final ScrollController _scrollController = ScrollController();
   String? _currentUsername;
@@ -72,6 +77,7 @@ class _FeedWidgetState extends State<FeedWidget> {
       final supabaseService = await SupabaseService.getInstance();
       _photoService = PhotoService(supabaseService);
       _authService = AuthService(supabaseService);
+      _reportService = ReportService(supabaseService);
       
       // Buscar username do usuário atual
       final userProfile = await _authService.getCurrentUserProfile();
@@ -181,20 +187,25 @@ class _FeedWidgetState extends State<FeedWidget> {
     }
   }
 
-  Future<void> _sharePhoto(PhotoModel photo) async {
-    try {
-      final url = photo.imageUrl;
-      if (await canLaunchUrl(Uri.parse(url))) {
-        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao compartilhar: $e'),
-          backgroundColor: FlutterFlowTheme.of(context).error,
-        ),
-      );
+  Future<void> _showReportBottomSheet(PhotoModel photo) async {
+    if (_reportService == null) {
+      Logger.warning('ReportService não inicializado');
+      return;
     }
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _ReportBottomSheet(
+        photo: photo,
+        reportService: _reportService!,
+      ),
+    );
+  }
+
+  Future<void> _sharePhoto(PhotoModel photo) async {
+    ShareBottomSheet.show(context, photo.id);
   }
 
   String _formatTimeAgo(DateTime dateTime) {
@@ -246,20 +257,15 @@ class _FeedWidgetState extends State<FeedWidget> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: _CommentsBottomSheet(
-          photo: photo,
-          initialComments: commentModels,
-          photoService: _photoService,
-          currentUserId: currentUserId,
-          onCommentAdded: () {
-            // Recarregar comentários e atualizar contador
-            _refreshPhotoComments(photo.id);
-          },
-        ),
+      builder: (context) => _CommentsBottomSheet(
+        photo: photo,
+        initialComments: commentModels,
+        photoService: _photoService,
+        currentUserId: currentUserId,
+        onCommentAdded: () {
+          // Recarregar comentários e atualizar contador
+          _refreshPhotoComments(photo.id);
+        },
       ),
     );
   }
@@ -470,6 +476,14 @@ class _FeedWidgetState extends State<FeedWidget> {
                       color: FlutterFlowTheme.of(context).secondary,
                       fontSize: 10.0,
                     ),
+                  ),
+                ),
+                InkWell(
+                  onTap: () => _showReportBottomSheet(photo),
+                  child: Icon(
+                    Icons.more_vert,
+                    color: FlutterFlowTheme.of(context).primaryText,
+                    size: 20.0,
                   ),
                 ),
               ],
@@ -957,6 +971,21 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
     final content = _commentController.text.trim();
     if (content.isEmpty) return;
 
+    // Verificar moderação de conteúdo
+    if (!ContentModerationService.validateComment(content)) {
+      if (mounted) {
+        Navigator.pop(context); // Fechar bottom sheet primeiro
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(ContentModerationService.getEducationalMessage()),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
     });
@@ -1098,23 +1127,26 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
     final maxHeight = screenHeight * 0.9; // Máximo de 90% da tela
-    final baseHeight = screenHeight * 0.75;
-    // Ajustar altura considerando o teclado, mas não ultrapassar 90% da tela
-    final containerHeight = (baseHeight + keyboardHeight).clamp(0.0, maxHeight);
     
-    return Container(
-      height: containerHeight,
-      decoration: BoxDecoration(
-        color: FlutterFlowTheme.of(context).secondaryBackground,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
-      child: Column(
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: maxHeight,
+        ),
+        decoration: BoxDecoration(
+          color: FlutterFlowTheme.of(context).secondaryBackground,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
         children: [
           // Header
           Container(
@@ -1286,11 +1318,11 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
           ),
           // Campo de input para novo comentário
           Container(
-            padding: EdgeInsetsDirectional.fromSTEB(
+            padding: const EdgeInsetsDirectional.fromSTEB(
               20, 
               12, 
               20, 
-              20 + MediaQuery.of(context).viewInsets.bottom,
+              20,
             ),
             decoration: BoxDecoration(
               color: FlutterFlowTheme.of(context).primaryBackground,
@@ -1370,6 +1402,212 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
             ),
           ),
         ],
+      ),
+      ),
+    );
+  }
+}
+
+// Widget para bottom sheet de denúncia
+class _ReportBottomSheet extends StatefulWidget {
+  final PhotoModel photo;
+  final ReportService reportService;
+
+  const _ReportBottomSheet({
+    required this.photo,
+    required this.reportService,
+  });
+
+  @override
+  State<_ReportBottomSheet> createState() => _ReportBottomSheetState();
+}
+
+class _ReportBottomSheetState extends State<_ReportBottomSheet> {
+  String? _selectedReason;
+  final TextEditingController _descriptionController = TextEditingController();
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitReport() async {
+    if (_selectedReason == null || _selectedReason!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Por favor, selecione um motivo para a denúncia'),
+          backgroundColor: FlutterFlowTheme.of(context).error,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      await widget.reportService.createReport(
+        photoId: widget.photo.id,
+        commentId: null,
+        reportType: ReportType.photo,
+        reason: _selectedReason!,
+        description: _descriptionController.text.trim().isEmpty
+            ? null
+            : _descriptionController.text.trim(),
+      );
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Denúncia enviada com sucesso. Obrigado por ajudar a manter nossa comunidade segura.'),
+            backgroundColor: FlutterFlowTheme.of(context).success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao enviar denúncia: $e'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
+        decoration: BoxDecoration(
+          color: FlutterFlowTheme.of(context).secondaryBackground,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Padding(
+          padding: EdgeInsetsDirectional.fromSTEB(20, 20, 20, 20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Denunciar Publicação',
+                    style: FlutterFlowTheme.of(context).headlineSmall.override(
+                          font: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          letterSpacing: 0.0,
+                        ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(0, 16, 0, 16),
+                child: Text(
+                  'Selecione o motivo da denúncia:',
+                  style: FlutterFlowTheme.of(context).bodyMedium.override(
+                        font: GoogleFonts.poppins(),
+                        letterSpacing: 0.0,
+                      ),
+                ),
+              ),
+              ...ReportReasons.all.map((reason) => RadioListTile<String>(
+                    title: Text(
+                      ReportReasons.displayNames[reason] ?? reason,
+                      style: FlutterFlowTheme.of(context).bodyMedium.override(
+                            font: GoogleFonts.poppins(),
+                            letterSpacing: 0.0,
+                          ),
+                    ),
+                    value: reason,
+                    groupValue: _selectedReason,
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedReason = value;
+                      });
+                    },
+                  )),
+              Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(0, 16, 0, 8),
+                child: Text(
+                  'Descrição adicional (opcional):',
+                  style: FlutterFlowTheme.of(context).bodyMedium.override(
+                        font: GoogleFonts.poppins(),
+                        letterSpacing: 0.0,
+                      ),
+                ),
+              ),
+              TextField(
+                controller: _descriptionController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Adicione mais detalhes sobre a denúncia...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(0, 24, 0, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                      child: Text('Cancelar'),
+                    ),
+                    SizedBox(width: 8),
+                    FFButtonWidget(
+                      onPressed: _isSubmitting ? null : _submitReport,
+                      text: _isSubmitting ? 'Enviando...' : 'Enviar Denúncia',
+                      options: FFButtonOptions(
+                        padding: EdgeInsetsDirectional.fromSTEB(24, 0, 24, 0),
+                        height: 40,
+                        color: FlutterFlowTheme.of(context).error,
+                        textStyle: FlutterFlowTheme.of(context).titleSmall.override(
+                              font: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w600,
+                              ),
+                              color: Colors.white,
+                              letterSpacing: 0.0,
+                            ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

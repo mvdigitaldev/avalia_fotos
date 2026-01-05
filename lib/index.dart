@@ -10,5 +10,8 @@ export '/pages/perfil/perfil_widget.dart' show PerfilWidget;
 export '/pages/tutorial_suporte/tutorial_suporte_widget.dart' show TutorialSuporteWidget;
 export '/pages/conquistas/conquistas_widget.dart' show ConquistasWidget;
 export '/pages/inspirar/inspirar_widget.dart' show InspirarWidget;
+export '/pages/reports/reports_widget.dart' show ReportsWidget;
+export '/pages/privacy/privacy_widget.dart' show PrivacyWidget;
+export '/pages/terms/terms_widget.dart' show TermsWidget;
 export '/login/login_widget.dart' show LoginWidget;
 export '/signup/signup_widget.dart' show SignupWidget;

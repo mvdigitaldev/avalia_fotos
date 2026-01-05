@@ -33,6 +33,8 @@ import '/pages/conquistas/conquistas_widget.dart';
 import '/pages/inspirar/inspirar_widget.dart';
 // Import NotificationsPage explicitly
 import '/pages/notifications/notifications_page.dart';
+// Import ReportsWidget explicitly
+import '/pages/reports/reports_widget.dart';
 
 export 'package:go_router/go_router.dart';
 export 'serialization_util.dart';
@@ -230,6 +232,12 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) {
         builder: (context, params) => params.isEmpty
             ? NavBarPage(initialPage: 'ranking')
             : RankingWidget(),
+      ),
+      FFRoute(
+        name: ReportsWidget.routeName,
+        path: ReportsWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => ReportsWidget(),
       ),
         FFRoute(
           name: LoginWidget.routeName,

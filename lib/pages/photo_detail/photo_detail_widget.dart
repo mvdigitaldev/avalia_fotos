@@ -14,6 +14,7 @@ import '../../services/photo_service.dart';
 import '../../services/auth_service.dart';
 import '../../utils/logger.dart';
 import '../../models/comment_model.dart';
+import '../../components/share_bottom_sheet.dart';
 import 'photo_detail_model.dart';
 export 'photo_detail_model.dart';
 
@@ -252,22 +253,7 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
 
   Future<void> _sharePhoto() async {
     if (_model.photo == null) return;
-
-    try {
-      final url = _model.photo!.imageUrl;
-      if (await canLaunchUrl(Uri.parse(url))) {
-        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao compartilhar: $e'),
-            backgroundColor: FlutterFlowTheme.of(context).error,
-          ),
-        );
-      }
-    }
+    ShareBottomSheet.show(context, _model.photo!.id);
   }
 
   String _formatTimeAgo(DateTime dateTime) {

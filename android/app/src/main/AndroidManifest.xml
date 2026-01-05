@@ -49,6 +49,15 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="avaliafotos" android:host="avaliafotos.com" />
             </intent-filter>
+            
+            <!-- Intent filter adicional para garantir que links funcionem mesmo sem app instalado -->
+            <!-- Quando o app não está instalado, o sistema pode sugerir instalar da Play Store -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="avaliafotos" android:host="avaliafotos.com" />
+            </intent-filter>
 
         </activity>
 

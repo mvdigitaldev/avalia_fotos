@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../main.dart';
 import '../../services/supabase_service.dart';
+import '../../services/report_service.dart';
 import '../../utils/logger.dart';
 import '../../services/notification_service.dart';
 import 'opcoes_model.dart';
@@ -31,6 +32,9 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
   bool isLoadingPlan = true;
   bool isFreePlan = false;
   int _unreadCount = 0;
+  int _pendingReportsCount = 0;
+  bool _isAdmin = false;
+  ReportService? _reportService;
 
   @override
   void setState(VoidCallback callback) {
@@ -44,6 +48,35 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
     _model = createModel(context, () => OpcoesModel());
     _loadPlanInfo();
     _loadUnreadCount();
+    _initializeReportService();
+  }
+
+  Future<void> _initializeReportService() async {
+    try {
+      final supabaseService = await SupabaseService.getInstance();
+      _reportService = ReportService(supabaseService);
+      _isAdmin = await _reportService!.isCurrentUserAdmin();
+      if (_isAdmin) {
+        await _loadPendingReportsCount();
+      }
+    } catch (e) {
+      Logger.error('Erro ao inicializar ReportService', e);
+    }
+  }
+
+  Future<void> _loadPendingReportsCount() async {
+    if (_reportService == null || !_isAdmin) return;
+    
+    try {
+      final count = await _reportService!.getPendingReportsCount();
+      if (mounted) {
+        setState(() {
+          _pendingReportsCount = count;
+        });
+      }
+    } catch (e) {
+      Logger.error('Erro ao carregar contagem de denúncias pendentes', e);
+    }
   }
 
   Future<void> _loadUnreadCount() async {
@@ -325,6 +358,98 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                                         .bodyMedium
                                         .fontStyle,
                                   ),
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_right_sharp,
+                          color: FlutterFlowTheme.of(context).primary,
+                          size: 24.0,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Item Denúncias (apenas para admins)
+            if (_isAdmin)
+              Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 8.0),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.of(context).pop(); // Fechar drawer
+                    context.push('/reports');
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Color(0x11868686),
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 8.0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.max,
+                        children: [
+                          Stack(
+                            children: [
+                              Icon(
+                                Icons.report_problem_outlined,
+                                color: FlutterFlowTheme.of(context).primary,
+                                size: 24.0,
+                              ),
+                              if (_pendingReportsCount > 0)
+                                Positioned(
+                                  right: 0,
+                                  top: 0,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    constraints: const BoxConstraints(
+                                      minWidth: 12,
+                                      minHeight: 12,
+                                    ),
+                                    child: Text(
+                                      '$_pendingReportsCount',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: EdgeInsetsDirectional.fromSTEB(
+                                  4.0, 0.0, 0.0, 0.0),
+                              child: Text(
+                                'Denúncias',
+                                style: FlutterFlowTheme.of(context)
+                                    .bodyMedium
+                                    .override(
+                                      font: GoogleFonts.poppins(
+                                        fontWeight: FlutterFlowTheme.of(context)
+                                            .bodyMedium
+                                            .fontWeight,
+                                        fontStyle: FlutterFlowTheme.of(context)
+                                            .bodyMedium
+                                            .fontStyle,
+                                      ),
+                                      letterSpacing: 0.0,
+                                      fontWeight: FlutterFlowTheme.of(context)
+                                          .bodyMedium
+                                          .fontWeight,
+                                      fontStyle: FlutterFlowTheme.of(context)
+                                          .bodyMedium
+                                          .fontStyle,
+                                    ),
                             ),
                           ),
                         ),
