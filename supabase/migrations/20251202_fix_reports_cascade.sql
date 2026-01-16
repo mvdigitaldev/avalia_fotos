@@ -20,3 +20,5 @@ FOREIGN KEY (comment_id)
 REFERENCES comments(id)
 ON DELETE SET NULL;
 
+
+

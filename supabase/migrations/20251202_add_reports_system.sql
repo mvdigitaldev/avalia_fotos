@@ -136,3 +136,5 @@ COMMENT ON TABLE reports IS 'Tabela para armazenar denúncias de posts e coment�
 COMMENT ON COLUMN users.is_admin IS 'Indica se o usuário é administrador do sistema';
 COMMENT ON FUNCTION get_pending_reports_count() IS 'Retorna a quantidade de denúncias pendentes. Apenas administradores podem executar.';
 
+
+

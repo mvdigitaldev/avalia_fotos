@@ -11,6 +11,7 @@ import 'package:intl/intl.dart';
 import '../../main.dart';
 import '../../services/supabase_service.dart';
 import '../../services/report_service.dart';
+import '../../services/plan_service.dart';
 import '../../utils/logger.dart';
 import '../../services/notification_service.dart';
 import 'opcoes_model.dart';
@@ -34,7 +35,9 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
   int _unreadCount = 0;
   int _pendingReportsCount = 0;
   bool _isAdmin = false;
+  bool _hasActivePlan = false;
   ReportService? _reportService;
+  PlanService? _planService;
 
   @override
   void setState(VoidCallback callback) {
@@ -49,6 +52,7 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
     _loadPlanInfo();
     _loadUnreadCount();
     _initializeReportService();
+    _checkUserHasActivePlan();
   }
 
   Future<void> _initializeReportService() async {
@@ -89,6 +93,40 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
       }
     } catch (e) {
       Logger.error('Erro ao carregar contagem de notificações', e);
+    }
+  }
+
+  Future<void> _checkUserHasActivePlan() async {
+    try {
+      final supabaseService = await SupabaseService.getInstance();
+      final currentUser = supabaseService.currentUser;
+      
+      if (currentUser == null) {
+        setState(() {
+          _hasActivePlan = false;
+        });
+        return;
+      }
+
+      if (_planService == null) {
+        _planService = PlanService(supabaseService);
+      }
+
+      final userPlan = await _planService!.getUserPlan(currentUser.id);
+      final hasActivePlan = userPlan != null && !userPlan.plan.isFree;
+      
+      if (mounted) {
+        setState(() {
+          _hasActivePlan = hasActivePlan;
+        });
+      }
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao verificar plano ativo do usuário', e, stackTrace);
+      if (mounted) {
+        setState(() {
+          _hasActivePlan = false;
+        });
+      }
     }
   }
 
@@ -372,6 +410,100 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                 ),
               ),
             ),
+            // Item Selecionar Foto do Dia (apenas para admins)
+            if (_isAdmin)
+              Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 8.0),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.of(context).pop(); // Fechar drawer
+                    context.push('/admin/select-photo-of-day');
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Color(0x11868686),
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 8.0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.max,
+                        children: [
+                          Icon(
+                            Icons.image,
+                            color: FlutterFlowTheme.of(context).primary,
+                            size: 24.0,
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 0.0, 0.0),
+                              child: Text(
+                                'Selecionar Foto do Dia',
+                                style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                      font: GoogleFonts.poppins(),
+                                      letterSpacing: 0.0,
+                                    ),
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.arrow_right_sharp,
+                            color: FlutterFlowTheme.of(context).primary,
+                            size: 24.0,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            // Item Enviar Notificação (apenas para admins)
+            if (_isAdmin)
+              Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 8.0),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.of(context).pop(); // Fechar drawer
+                    context.push('/admin/send-push-notification');
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Color(0x11868686),
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 8.0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.max,
+                        children: [
+                          Icon(
+                            Icons.send,
+                            color: FlutterFlowTheme.of(context).primary,
+                            size: 24.0,
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 0.0, 0.0),
+                              child: Text(
+                                'Enviar Notificação',
+                                style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                      font: GoogleFonts.poppins(),
+                                      letterSpacing: 0.0,
+                                    ),
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.arrow_right_sharp,
+                            color: FlutterFlowTheme.of(context).primary,
+                            size: 24.0,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             // Item Denúncias (apenas para admins)
             if (_isAdmin)
               Padding(
@@ -509,6 +641,55 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                                     fontStyle: FlutterFlowTheme.of(context)
                                         .bodyMedium
                                         .fontStyle,
+                                  ),
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_right_sharp,
+                          color: FlutterFlowTheme.of(context).primary,
+                          size: 24.0,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Item Premiações (visível para todos os usuários)
+            Padding(
+              padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 8.0),
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).pop(); // Fechar drawer
+                  context.push('/premiacoes');
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Color(0x11868686),
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 8.0),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.max,
+                      children: [
+                        Icon(
+                          FontAwesomeIcons.medal,
+                          color: FlutterFlowTheme.of(context).primary,
+                          size: 24.0,
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsetsDirectional.fromSTEB(
+                                12.0, 0.0, 0.0, 0.0),
+                            child: Text(
+                              'Premiações',
+                              style: FlutterFlowTheme.of(context)
+                                  .bodyMedium
+                                  .override(
+                                    font: GoogleFonts.poppins(),
+                                    letterSpacing: 0.0,
                                   ),
                             ),
                           ),

@@ -13,11 +13,13 @@ import '../../services/storage_service.dart';
 import '../../services/ai_evaluation_service.dart';
 import '../../services/plan_service.dart';
 import '../../services/photo_service.dart';
+import '../../services/ad_service.dart';
 import '../../utils/logger.dart';
 import '../../services/achievement_service.dart';
 import '../../models/photo_model.dart';
 import '../../models/achievement_model.dart';
 import '../../components/achievement_unlocked_modal.dart';
+import '../../components/interstitial_ad_manager.dart';
 import 'package:go_router/go_router.dart';
 import 'avalia_model.dart';
 export 'avalia_model.dart';
@@ -40,6 +42,8 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
   late AIEvaluationService _aiService;
   late PlanService _planService;
   late AchievementService _achievementService;
+  AdService? _adService;
+  InterstitialAdManager? _interstitialAdManager;
   bool _servicesInitialized = false;
 
   @override
@@ -58,6 +62,13 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
       _aiService = AIEvaluationService(supabaseService);
       _planService = PlanService(supabaseService);
       _achievementService = AchievementService(supabaseService);
+      _adService = AdService(supabaseService);
+      
+      // Criar InterstitialAdManager e pré-carregar anúncio
+      // O SDK já é inicializado no main.dart, não precisamos inicializar novamente
+      _interstitialAdManager = InterstitialAdManager(_adService!);
+      _interstitialAdManager!.preloadAd();
+      
       setState(() {
         _servicesInitialized = true;
       });
@@ -119,6 +130,9 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
       );
       return;
     }
+
+    // Mostrar intersticial antes de avaliar (para usuários free)
+    await _interstitialAdManager?.showAd();
 
     safeSetState(() {
       _model.isLoading = true;
@@ -194,6 +208,9 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
       
       // Atualizar limites após avaliação (inclui contagem de fotos armazenadas)
       await _checkLimits();
+      
+      // Mostrar intersticial após avaliação completa (para usuários free)
+      await _interstitialAdManager?.showAd();
     } catch (e) {
       safeSetState(() {
         _model.isLoading = false;
@@ -643,7 +660,7 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
   @override
   void dispose() {
     _model.dispose();
-
+    _interstitialAdManager?.dispose();
     super.dispose();
   }
 

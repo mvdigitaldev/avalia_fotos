@@ -30,7 +30,8 @@ class PlanService {
               price,
               link_plan,
               apple_product_id,
-              google_product_id
+              google_product_id,
+              duration_months
             )
           ''')
           .eq('user_id', userId)
@@ -145,12 +146,22 @@ class PlanService {
     try {
       final response = await _client
           .from('plans')
-          .select('id, name, monthly_evaluations_limit, storage_limit, price, link_plan, apple_product_id, google_product_id')
+          .select('id, name, monthly_evaluations_limit, storage_limit, price, link_plan, apple_product_id, google_product_id, duration_months')
           .order('price', ascending: true);
 
       return (response as List)
           .map((item) => PlanModel.fromJson(item))
           .toList();
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Verifica se o usuário está no plano free
+  Future<bool> isUserOnFreePlan(String userId) async {
+    try {
+      final userPlan = await getUserPlan(userId);
+      return userPlan?.plan.isFree ?? true;
     } catch (e) {
       throw _handleError(e);
     }

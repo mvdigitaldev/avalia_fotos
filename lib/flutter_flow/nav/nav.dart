@@ -35,6 +35,12 @@ import '/pages/inspirar/inspirar_widget.dart';
 import '/pages/notifications/notifications_page.dart';
 // Import ReportsWidget explicitly
 import '/pages/reports/reports_widget.dart';
+// Import PremiacoesWidget explicitly
+import '/pages/premiacoes/premiacoes_widget.dart';
+// Import SelectPhotoOfDayWidget explicitly
+import '/pages/admin/select_photo_of_day_widget.dart';
+// Import SendPushNotificationWidget explicitly
+import '/pages/admin/send_push_notification_widget.dart';
 
 export 'package:go_router/go_router.dart';
 export 'serialization_util.dart';
@@ -238,6 +244,24 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) {
         path: ReportsWidget.routePath,
         requireAuth: true,
         builder: (context, params) => ReportsWidget(),
+      ),
+      FFRoute(
+        name: PremiacoesWidget.routeName,
+        path: PremiacoesWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => PremiacoesWidget(),
+      ),
+      FFRoute(
+        name: SelectPhotoOfDayWidget.routeName,
+        path: SelectPhotoOfDayWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => SelectPhotoOfDayWidget(),
+      ),
+      FFRoute(
+        name: SendPushNotificationWidget.routeName,
+        path: SendPushNotificationWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => SendPushNotificationWidget(),
       ),
         FFRoute(
           name: LoginWidget.routeName,

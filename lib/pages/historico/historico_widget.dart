@@ -10,8 +10,12 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/supabase_service.dart';
 import '../../services/photo_service.dart';
+import '../../services/ad_service.dart';
 import '../../utils/logger.dart';
 import '../../models/photo_model.dart';
+import '../../components/banner_ad_widget.dart';
+import '../../components/photo_trophy_badge.dart';
+import '../../services/photo_of_the_day_service.dart';
 import 'historico_model.dart';
 export 'historico_model.dart';
 
@@ -30,7 +34,10 @@ class _HistoricoWidgetState extends State<HistoricoWidget> {
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
   late PhotoService _photoService;
+  AdService? _adService;
+  PhotoOfTheDayService? _photoOfTheDayService;
   bool _servicesInitialized = false;
+  final Map<String, bool> _photoOfDayCache = {};
   final ScrollController _scrollController = ScrollController();
 
   // Cache manager customizado para thumbnails
@@ -54,6 +61,11 @@ class _HistoricoWidgetState extends State<HistoricoWidget> {
     try {
       final supabaseService = await SupabaseService.getInstance();
       _photoService = PhotoService(supabaseService);
+      _adService = AdService(supabaseService);
+      _photoOfTheDayService = PhotoOfTheDayService(supabaseService);
+      
+      // O SDK já é inicializado no main.dart, não precisamos inicializar novamente
+      
       setState(() {
         _servicesInitialized = true;
       });
@@ -327,6 +339,22 @@ class _HistoricoWidgetState extends State<HistoricoWidget> {
               ),
             ),
           ),
+          // Badge de troféu se for foto do dia
+          FutureBuilder<bool>(
+            future: _isPhotoOfTheDay(photo.id, photo.createdAt),
+            builder: (context, snapshot) {
+              if (snapshot.data == true && !_model.isSelectionMode) {
+                return Positioned(
+                  top: 8,
+                  right: 8,
+                  child: PhotoTrophyBadge(
+                    size: TrophyBadgeSize.small,
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
           // Ícone de check quando selecionado
           if (_model.isSelectionMode && isSelected)
             Positioned(
@@ -349,6 +377,27 @@ class _HistoricoWidgetState extends State<HistoricoWidget> {
         ],
       ),
     );
+  }
+
+  Future<bool> _isPhotoOfTheDay(String photoId, DateTime photoDate) async {
+    final cacheKey = '$photoId-${photoDate.toIso8601String().split('T')[0]}';
+    if (_photoOfDayCache.containsKey(cacheKey)) {
+      return _photoOfDayCache[cacheKey]!;
+    }
+
+    if (_photoOfTheDayService == null) return false;
+
+    try {
+      final isPhotoOfDay = await _photoOfTheDayService!.isPhotoOfTheDay(
+        photoId,
+        photoDate,
+      );
+      _photoOfDayCache[cacheKey] = isPhotoOfDay;
+      return isPhotoOfDay;
+    } catch (e) {
+      Logger.debug('Erro ao verificar se foto é do dia: $e');
+      return false;
+    }
   }
 
   @override
@@ -576,6 +625,9 @@ class _HistoricoWidgetState extends State<HistoricoWidget> {
                             },
                           ),
               ),
+              // Banner ad no bottom
+              if (_adService != null)
+                BannerAdWidget(adService: _adService!),
             ],
           ),
         ),

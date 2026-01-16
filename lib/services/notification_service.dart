@@ -4,9 +4,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; // Added import
+import 'package:go_router/go_router.dart';
 import '../firebase_options.dart';
 import 'supabase_service.dart';
 import '../utils/logger.dart';
+import '../flutter_flow/nav/nav.dart';
 
 /// Handler para mensagens recebidas em background
 @pragma('vm:entry-point')
@@ -373,6 +375,10 @@ class NotificationService {
     }
     
     Logger.info('Mensagem recebida em foreground: $messageId');
+    Logger.info('Dados: ${message.data}');
+    
+    // Processar deep linking
+    _processNotificationDeepLink(message.data);
     
     // Mostrar notificação local quando app está em foreground
     _showLocalNotification(message);
@@ -383,8 +389,8 @@ class NotificationService {
     Logger.info('Mensagem recebida em background: ${message.messageId}');
     Logger.info('Dados: ${message.data}');
     
-    // Aqui você pode navegar para uma tela específica baseado nos dados
-    // Por exemplo, se for uma curtida, navegar para a foto
+    // Processar deep linking baseado no tipo de notificação
+    _processNotificationDeepLink(message.data);
   }
 
   /// Mostra notificação local
@@ -423,7 +429,58 @@ class NotificationService {
   /// Callback quando notificação é tocada
   void _onNotificationTapped(NotificationResponse response) {
     Logger.info('Notificação tocada: ${response.payload}');
-    // Aqui você pode navegar para uma tela específica
+    
+    // Tentar parsear payload como dados JSON
+    try {
+      if (response.payload != null && response.payload!.isNotEmpty) {
+        // O payload pode conter dados da notificação
+        // Processar através do handler de mensagens se possível
+        Logger.debug('Payload da notificação: ${response.payload}');
+      }
+    } catch (e) {
+      Logger.debug('Erro ao processar payload da notificação: $e');
+    }
+  }
+
+  /// Processa deep linking baseado nos dados da notificação
+  void _processNotificationDeepLink(Map<String, dynamic> data) {
+    try {
+      final type = data['type'] as String?;
+      
+      if (type == 'photo_of_the_day') {
+        final date = data['date'] as String?;
+        final deepLink = data['deep_link'] as String?;
+        
+        String? linkToNavigate;
+        if (deepLink != null) {
+          linkToNavigate = deepLink;
+        } else if (date != null) {
+          // Fallback: construir deep link a partir da data
+          linkToNavigate = '/premiacoes?date=$date';
+        }
+        
+        if (linkToNavigate != null) {
+          Logger.info('Deep link para foto do dia: $linkToNavigate');
+          // Navegar usando o router global
+          // Usar um delay para garantir que o contexto está pronto
+          Future.delayed(const Duration(milliseconds: 500), () {
+            try {
+              final context = appNavigatorKey.currentContext;
+              if (context != null) {
+                final router = GoRouter.of(context);
+                router.push(linkToNavigate!);
+              } else {
+                Logger.warning('Contexto não disponível para navegação');
+              }
+            } catch (e) {
+              Logger.warning('Erro ao navegar para deep link: $e');
+            }
+          });
+        }
+      }
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao processar deep link', e, stackTrace);
+    }
   }
 
   /// Obtém o token atual

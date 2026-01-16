@@ -12,8 +12,10 @@ import '/flutter_flow/nav/nav.dart';
 import '/services/supabase_service.dart';
 import '/services/notification_service.dart';
 import '/services/route_tracker_service.dart';
+import '/services/ad_service.dart';
 import '/utils/logger.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'firebase_options.dart';
 import 'index.dart';
 
@@ -67,6 +69,25 @@ void main() async {
     } catch (e2, stackTrace2) {
       Logger.critical('Falha crítica na inicialização do Supabase', e2, stackTrace2);
       // Continuar mesmo assim - o fallback deve funcionar
+    }
+  }
+
+  // Inicializar Google Mobile Ads
+  if (!kIsWeb) {
+    try {
+      final status = await MobileAds.instance.initialize();
+      Logger.info('Google Mobile Ads inicializado com sucesso');
+      status.adapterStatuses.forEach((adapter, adapterStatus) {
+        Logger.debug('Adapter: $adapter, State: ${adapterStatus.state}');
+      });
+      // Aguardar um pouco para garantir que o SDK está completamente pronto
+      // O SDK pode precisar de tempo adicional após initialize() retornar
+      await Future.delayed(const Duration(milliseconds: 500));
+      // Marcar como inicializado para que os componentes possam usar
+      AdService.markInitialized();
+      Logger.info('Google Mobile Ads marcado como pronto para uso');
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao inicializar Google Mobile Ads', e, stackTrace);
     }
   }
 

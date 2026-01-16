@@ -20,10 +20,15 @@ import '../../services/photo_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/report_service.dart';
 import '../../services/content_moderation_service.dart';
+import '../../services/ad_service.dart';
 import '../../models/photo_model.dart';
 import '../../models/comment_model.dart';
 import '../../models/report_model.dart';
 import '../../utils/logger.dart';
+import '../../components/banner_ad_widget.dart';
+import '../../components/interstitial_ad_manager.dart';
+import '../../components/photo_trophy_badge.dart';
+import '../../services/photo_of_the_day_service.dart';
 import 'feed_model.dart';
 export 'feed_model.dart';
 
@@ -44,9 +49,14 @@ class _FeedWidgetState extends State<FeedWidget> {
   late PhotoService _photoService;
   late AuthService _authService;
   ReportService? _reportService;
+  AdService? _adService;
+  InterstitialAdManager? _interstitialAdManager;
+  PhotoOfTheDayService? _photoOfTheDayService;
   bool _servicesInitialized = false;
   final ScrollController _scrollController = ScrollController();
   String? _currentUsername;
+  int _photoViewsCount = 0; // Contador para intersticiais
+  final Map<String, bool> _photoOfDayCache = {}; // Cache de fotos do dia
   
   // Cache manager customizado para fotos
   static final CacheManager _photoCacheManager = CacheManager(
@@ -78,6 +88,13 @@ class _FeedWidgetState extends State<FeedWidget> {
       _photoService = PhotoService(supabaseService);
       _authService = AuthService(supabaseService);
       _reportService = ReportService(supabaseService);
+      _adService = AdService(supabaseService);
+      _photoOfTheDayService = PhotoOfTheDayService(supabaseService);
+      
+      // Criar InterstitialAdManager e pré-carregar anúncio
+      // O SDK já é inicializado no main.dart, não precisamos inicializar novamente
+      _interstitialAdManager = InterstitialAdManager(_adService!);
+      _interstitialAdManager!.preloadAd();
       
       // Buscar username do usuário atual
       final userProfile = await _authService.getCurrentUserProfile();
@@ -349,7 +366,9 @@ class _FeedWidgetState extends State<FeedWidget> {
     }
 
     // Usar CachedNetworkImage para todas as plataformas (melhor cache e compatibilidade)
-    return CachedNetworkImage(
+    return Stack(
+      children: [
+        CachedNetworkImage(
       imageUrl: photo.imageUrl,
       width: double.infinity,
       // Altura removida para respeitar a proporção da imagem
@@ -424,7 +443,47 @@ class _FeedWidgetState extends State<FeedWidget> {
       httpHeaders: {
         'Accept': 'image/*',
       },
+        ),
+        // Badge de troféu se for foto do dia
+        FutureBuilder<bool>(
+          future: _isPhotoOfTheDay(photo.id, photo.createdAt),
+          builder: (context, snapshot) {
+            if (snapshot.data == true) {
+              return Positioned(
+                top: 12,
+                right: 12,
+                child: PhotoTrophyBadge(
+                  size: TrophyBadgeSize.medium,
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          },
+        ),
+      ],
     );
+  }
+
+  Future<bool> _isPhotoOfTheDay(String photoId, DateTime photoDate) async {
+    // Usar cache para evitar múltiplas queries
+    final cacheKey = '$photoId-${photoDate.toIso8601String().split('T')[0]}';
+    if (_photoOfDayCache.containsKey(cacheKey)) {
+      return _photoOfDayCache[cacheKey]!;
+    }
+
+    if (_photoOfTheDayService == null) return false;
+
+    try {
+      final isPhotoOfDay = await _photoOfTheDayService!.isPhotoOfTheDay(
+        photoId,
+        photoDate,
+      );
+      _photoOfDayCache[cacheKey] = isPhotoOfDay;
+      return isPhotoOfDay;
+    } catch (e) {
+      Logger.debug('Erro ao verificar se foto é do dia: $e');
+      return false;
+    }
   }
 
   Widget _buildPhotoCard(PhotoModel photo) {
@@ -634,7 +693,7 @@ class _FeedWidgetState extends State<FeedWidget> {
   void dispose() {
     _scrollController.dispose();
     _model.dispose();
-
+    _interstitialAdManager?.dispose();
     super.dispose();
   }
 
@@ -875,7 +934,16 @@ class _FeedWidgetState extends State<FeedWidget> {
                                   ),
                                 ),
                               // Lista de fotos
-                              ..._model.photos.map((photo) => _buildPhotoCard(photo)),
+                              ..._model.photos.map((photo) {
+                                // Incrementar contador de visualizações e mostrar intersticial a cada 5 fotos
+                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  _photoViewsCount++;
+                                  if (_photoViewsCount % 5 == 0) {
+                                    _interstitialAdManager?.showAd();
+                                  }
+                                });
+                                return _buildPhotoCard(photo);
+                              }),
                               // Indicador de carregamento ao rolar para baixo
                               if (_model.isLoading && _model.photos.isNotEmpty)
                                 Padding(
@@ -893,6 +961,9 @@ class _FeedWidgetState extends State<FeedWidget> {
                   ),
                 ),
               ),
+              // Banner ad no bottom
+              if (_adService != null)
+                BannerAdWidget(adService: _adService!),
             ],
           ),
         ),

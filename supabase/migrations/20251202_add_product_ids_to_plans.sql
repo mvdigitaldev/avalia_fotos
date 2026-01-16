@@ -7,3 +7,5 @@ ADD COLUMN IF NOT EXISTS google_product_id TEXT;
 COMMENT ON COLUMN plans.apple_product_id IS 'Product ID do App Store Connect (ex: com.yourapp.plan.basic_monthly)';
 COMMENT ON COLUMN plans.google_product_id IS 'Product ID do Google Play Console (ex: com.yourapp.plan.basic_monthly)';
 
+
+

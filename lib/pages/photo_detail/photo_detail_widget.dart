@@ -15,6 +15,8 @@ import '../../services/auth_service.dart';
 import '../../utils/logger.dart';
 import '../../models/comment_model.dart';
 import '../../components/share_bottom_sheet.dart';
+import '../../components/photo_trophy_badge.dart';
+import '../../services/photo_of_the_day_service.dart';
 import 'photo_detail_model.dart';
 export 'photo_detail_model.dart';
 
@@ -34,8 +36,10 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
   final scaffoldKey = GlobalKey<ScaffoldState>();
   late PhotoService _photoService;
   late AuthService _authService;
+  PhotoOfTheDayService? _photoOfTheDayService;
   bool _servicesInitialized = false;
   final ScrollController _scrollController = ScrollController();
+  bool? _isPhotoOfDay;
 
   // Cache manager customizado para fotos
   static final CacheManager _photoCacheManager = CacheManager(
@@ -58,6 +62,7 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
       final supabaseService = await SupabaseService.getInstance();
       _photoService = PhotoService(supabaseService);
       _authService = AuthService(supabaseService);
+      _photoOfTheDayService = PhotoOfTheDayService(supabaseService);
       setState(() {
         _servicesInitialized = true;
       });
@@ -97,6 +102,17 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
       final comments = await commentsFuture;
 
       final commentModels = comments.map((c) => CommentModel.fromJson(c)).toList();
+
+      // Verificar se é foto do dia
+      if (_photoOfTheDayService != null) {
+        final isPhotoOfDay = await _photoOfTheDayService!.isPhotoOfTheDay(
+          photo.id,
+          photo.createdAt,
+        );
+        setState(() {
+          _isPhotoOfDay = isPhotoOfDay;
+        });
+      }
 
       safeSetState(() {
         _model.photo = photo;
@@ -472,7 +488,9 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
         color: FlutterFlowTheme.of(context).alternate,
       ),
       child: _model.photo!.imageUrl.isNotEmpty
-          ? CachedNetworkImage(
+          ? Stack(
+              children: [
+                CachedNetworkImage(
               imageUrl: _model.photo!.imageUrl,
               width: double.infinity,
               height: MediaQuery.of(context).size.height * 0.4,
@@ -504,6 +522,17 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
                   ),
                 ),
               ),
+                ),
+                // Badge de troféu se for foto do dia
+                if (_isPhotoOfDay == true)
+                  Positioned(
+                    top: 16,
+                    right: 16,
+                    child: PhotoTrophyBadge(
+                      size: TrophyBadgeSize.large,
+                    ),
+                  ),
+              ],
             )
           : Container(
               width: double.infinity,

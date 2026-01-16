@@ -457,6 +457,64 @@ class _PlansWidgetState extends State<PlansWidget> with TickerProviderStateMixin
     }
   }
 
+  /// Agrupa e retorna widgets de planos organizados por tipo
+  List<Widget> _buildGroupedPlans() {
+    final basicPlans = _model.availablePlans.where((plan) => 
+      plan.name.toLowerCase().contains('básico') || 
+      plan.name.toLowerCase().contains('basico')
+    ).toList();
+    
+    final proPlans = _model.availablePlans.where((plan) => 
+      plan.name.toLowerCase().contains('pro')
+    ).toList();
+    
+    // Ordenar por duração
+    basicPlans.sort((a, b) => (a.durationMonths ?? 0).compareTo(b.durationMonths ?? 0));
+    proPlans.sort((a, b) => (a.durationMonths ?? 0).compareTo(b.durationMonths ?? 0));
+    
+    final widgets = <Widget>[];
+    
+    // Seção Básico
+    if (basicPlans.isNotEmpty) {
+      widgets.add(
+        Padding(
+          padding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 8),
+          child: Text(
+            'Plano Básico',
+            style: FlutterFlowTheme.of(context).titleMedium.override(
+                  font: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600,
+                  ),
+                  letterSpacing: 0.0,
+                ),
+          ),
+        ),
+      );
+      widgets.addAll(basicPlans.map((plan) => _buildPlanCard(plan)));
+    }
+    
+    // Seção PRO
+    if (proPlans.isNotEmpty) {
+      widgets.add(
+        Padding(
+          padding: EdgeInsetsDirectional.fromSTEB(0, 16, 0, 8),
+          child: Text(
+            'Plano PRO',
+            style: FlutterFlowTheme.of(context).titleMedium.override(
+                  font: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600,
+                  ),
+                  letterSpacing: 0.0,
+                ),
+          ),
+        ),
+      );
+      widgets.addAll(proPlans.map((plan) => _buildPlanCard(plan)));
+    }
+    
+    return widgets;
+  }
+
   Widget _buildPlanCard(PlanModel plan) {
     final isCurrentPlan = _model.currentPlan?.plan.id == plan.id;
     
@@ -480,14 +538,33 @@ class _PlansWidgetState extends State<PlansWidget> with TickerProviderStateMixin
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  plan.name,
-                  style: FlutterFlowTheme.of(context).headlineSmall.override(
-                        font: GoogleFonts.poppins(
-                          fontWeight: FontWeight.bold,
-                        ),
-                        letterSpacing: 0.0,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        plan.name,
+                        style: FlutterFlowTheme.of(context).headlineSmall.override(
+                              font: GoogleFonts.poppins(
+                                fontWeight: FontWeight.bold,
+                              ),
+                              letterSpacing: 0.0,
+                            ),
                       ),
+                      if (plan.durationMonths != null)
+                        Padding(
+                          padding: EdgeInsetsDirectional.fromSTEB(0, 4, 0, 0),
+                          child: Text(
+                            plan.durationText,
+                            style: FlutterFlowTheme.of(context).bodySmall.override(
+                                  font: GoogleFonts.poppins(),
+                                  color: FlutterFlowTheme.of(context).secondary,
+                                  letterSpacing: 0.0,
+                                ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
                 if (isCurrentPlan)
                   Container(
@@ -584,6 +661,10 @@ class _PlansWidgetState extends State<PlansWidget> with TickerProviderStateMixin
 
     // Fallback para preço do banco
     if (plan.price != null) {
+      // Se o plano tem duração, mostrar o preço total, não mensal
+      if (plan.durationMonths != null) {
+        return 'R\$ ${plan.price!.toStringAsFixed(2)}';
+      }
       return 'R\$ ${plan.price!.toStringAsFixed(2)}/mês';
     }
 
@@ -1148,7 +1229,8 @@ class _PlansWidgetState extends State<PlansWidget> with TickerProviderStateMixin
                                         ),
                                   ),
                                 ),
-                                ..._model.availablePlans.map((plan) => _buildPlanCard(plan)),
+                                // Agrupar e exibir planos por tipo
+                                ..._buildGroupedPlans(),
                               ],
                             ),
                           ),
