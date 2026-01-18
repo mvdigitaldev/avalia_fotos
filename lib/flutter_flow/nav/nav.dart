@@ -21,6 +21,8 @@ import '/index.dart';
 
 // Import PlansWidget explicitly
 import '/pages/plans/plans_widget.dart';
+// Import PlansAsaasWidget explicitly
+import '/pages/plans_asaas/plans_asaas_widget.dart';
 // Import PerfilWidget explicitly
 import '/pages/perfil/perfil_widget.dart';
 // Import TutorialSuporteWidget explicitly
@@ -286,6 +288,12 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) {
         path: PlansWidget.routePath,
         requireAuth: true,
         builder: (context, params) => PlansWidget(),
+      ),
+      FFRoute(
+        name: PlansAsaasWidget.routeName,
+        path: PlansAsaasWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => PlansAsaasWidget(),
       ),
       FFRoute(
         name: PerfilWidget.routeName,

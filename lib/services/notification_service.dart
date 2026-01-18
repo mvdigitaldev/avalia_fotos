@@ -477,6 +477,29 @@ class NotificationService {
             }
           });
         }
+      } else if (type == 'upgrade_plan') {
+        final deepLink = data['deep_link'] as String?;
+        
+        String? linkToNavigate = deepLink ?? '/plans';
+        
+        if (linkToNavigate != null) {
+          Logger.info('Deep link para upgrade de plano: $linkToNavigate');
+          // Navegar usando o router global
+          // Usar um delay para garantir que o contexto está pronto
+          Future.delayed(const Duration(milliseconds: 500), () {
+            try {
+              final context = appNavigatorKey.currentContext;
+              if (context != null) {
+                final router = GoRouter.of(context);
+                router.push(linkToNavigate!);
+              } else {
+                Logger.warning('Contexto não disponível para navegação');
+              }
+            } catch (e) {
+              Logger.warning('Erro ao navegar para deep link: $e');
+            }
+          });
+        }
       }
     } catch (e, stackTrace) {
       Logger.error('Erro ao processar deep link', e, stackTrace);

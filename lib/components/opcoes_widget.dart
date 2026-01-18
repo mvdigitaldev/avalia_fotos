@@ -940,7 +940,10 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                                 Navigator.of(context).pop(); // Fechar drawer
                                 context.push('/plans');
                               }
-                            : null,
+                            : () {
+                                Navigator.of(context).pop(); // Fechar drawer
+                                context.push('/plans_assas');
+                              },
                         child: Container(
                           decoration: BoxDecoration(
                             color: Color(0x11868686),
