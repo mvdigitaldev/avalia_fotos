@@ -19,6 +19,7 @@ import '../../services/supabase_service.dart';
 import '../../services/photo_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/report_service.dart';
+import '../../services/block_service.dart';
 import '../../services/content_moderation_service.dart';
 import '../../services/ad_service.dart';
 import '../../models/photo_model.dart';
@@ -49,6 +50,7 @@ class _FeedWidgetState extends State<FeedWidget> {
   late PhotoService _photoService;
   late AuthService _authService;
   ReportService? _reportService;
+  BlockService? _blockService;
   AdService? _adService;
   InterstitialAdManager? _interstitialAdManager;
   PhotoOfTheDayService? _photoOfTheDayService;
@@ -87,8 +89,12 @@ class _FeedWidgetState extends State<FeedWidget> {
       _photoService = PhotoService(supabaseService);
       _authService = AuthService(supabaseService);
       _reportService = ReportService(supabaseService);
+      _blockService = BlockService(supabaseService);
       _adService = AdService(supabaseService);
       _photoOfTheDayService = PhotoOfTheDayService(supabaseService);
+      
+      // Configurar BlockService no PhotoService para filtrar usuários bloqueados
+      _photoService.setBlockService(_blockService!);
       
       // Criar InterstitialAdManager e pré-carregar anúncio
       // O SDK já é inicializado no main.dart, não precisamos inicializar novamente
@@ -200,6 +206,115 @@ class _FeedWidgetState extends State<FeedWidget> {
           backgroundColor: FlutterFlowTheme.of(context).error,
         ),
       );
+    }
+  }
+
+  Future<void> _showOptionsBottomSheet(PhotoModel photo) async {
+    final currentUserId = _authService.currentUser?.id;
+    if (currentUserId == null || photo.userId == currentUserId) {
+      // Se não estiver logado ou for a própria foto, mostrar apenas denúncia
+      _showReportBottomSheet(photo);
+      return;
+    }
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _OptionsBottomSheet(
+        photo: photo,
+        onBlockUser: () async {
+          Navigator.pop(context);
+          await _blockUser(photo);
+        },
+        onReport: () {
+          Navigator.pop(context);
+          _showReportBottomSheet(photo);
+        },
+      ),
+    );
+  }
+
+  Future<void> _blockUser(PhotoModel photo) async {
+    if (_blockService == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Serviço de bloqueio não inicializado'),
+          backgroundColor: FlutterFlowTheme.of(context).error,
+        ),
+      );
+      return;
+    }
+
+    // Verificar se o usuário já está bloqueado
+    final isBlocked = await _blockService!.isUserBlocked(photo.userId);
+    if (isBlocked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Este usuário já está bloqueado'),
+          backgroundColor: FlutterFlowTheme.of(context).secondary,
+        ),
+      );
+      return;
+    }
+
+    // Mostrar diálogo de confirmação
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Bloquear usuário'),
+        content: Text(
+          'Você não verá mais conteúdo de ${photo.username ?? "este usuário"}. '
+          'Esta ação pode ser revertida nas configurações.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              foregroundColor: FlutterFlowTheme.of(context).error,
+            ),
+            child: Text('Bloquear'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await _blockService!.blockUser(
+        blockedUserId: photo.userId,
+        contextPhotoId: photo.id,
+      );
+
+      // Remover todas as fotos do usuário bloqueado do feed imediatamente
+      safeSetState(() {
+        _model.photos.removeWhere((p) => p.userId == photo.userId);
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Usuário bloqueado com sucesso. Você não verá mais conteúdo deste usuário.',
+            ),
+            backgroundColor: FlutterFlowTheme.of(context).success,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao bloquear usuário: $e'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+      }
     }
   }
 
@@ -537,7 +652,7 @@ class _FeedWidgetState extends State<FeedWidget> {
                   ),
                 ),
                 InkWell(
-                  onTap: () => _showReportBottomSheet(photo),
+                  onTap: () => _showOptionsBottomSheet(photo),
                   child: Icon(
                     Icons.more_vert,
                     color: FlutterFlowTheme.of(context).primaryText,
@@ -1472,6 +1587,103 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
 }
 
 // Widget para bottom sheet de denúncia
+class _OptionsBottomSheet extends StatelessWidget {
+  final PhotoModel photo;
+  final VoidCallback onBlockUser;
+  final VoidCallback onReport;
+
+  const _OptionsBottomSheet({
+    required this.photo,
+    required this.onBlockUser,
+    required this.onReport,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: FlutterFlowTheme.of(context).secondaryBackground,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: EdgeInsetsDirectional.fromSTEB(20, 16, 20, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Opções',
+                    style: FlutterFlowTheme.of(context).headlineSmall.override(
+                          font: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          letterSpacing: 0.0,
+                        ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            Divider(),
+            ListTile(
+              leading: Icon(
+                Icons.block,
+                color: FlutterFlowTheme.of(context).error,
+              ),
+              title: Text(
+                'Bloquear usuário',
+                style: FlutterFlowTheme.of(context).bodyLarge.override(
+                      font: GoogleFonts.poppins(),
+                      letterSpacing: 0.0,
+                    ),
+              ),
+              subtitle: Text(
+                'Você não verá mais conteúdo deste usuário',
+                style: FlutterFlowTheme.of(context).bodySmall.override(
+                      font: GoogleFonts.poppins(),
+                      letterSpacing: 0.0,
+                    ),
+              ),
+              onTap: onBlockUser,
+            ),
+            ListTile(
+              leading: Icon(
+                Icons.flag_outlined,
+                color: FlutterFlowTheme.of(context).error,
+              ),
+              title: Text(
+                'Denunciar publicação',
+                style: FlutterFlowTheme.of(context).bodyLarge.override(
+                      font: GoogleFonts.poppins(),
+                      letterSpacing: 0.0,
+                    ),
+              ),
+              subtitle: Text(
+                'Reportar conteúdo inadequado',
+                style: FlutterFlowTheme.of(context).bodySmall.override(
+                      font: GoogleFonts.poppins(),
+                      letterSpacing: 0.0,
+                    ),
+              ),
+              onTap: onReport,
+            ),
+            SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ReportBottomSheet extends StatefulWidget {
   final PhotoModel photo;
   final ReportService reportService;

@@ -35,6 +35,8 @@ import '/pages/conquistas/conquistas_widget.dart';
 import '/pages/inspirar/inspirar_widget.dart';
 // Import NotificationsPage explicitly
 import '/pages/notifications/notifications_page.dart';
+// Import BlockedUsersWidget explicitly
+import '/pages/blocked_users/blocked_users_widget.dart';
 // Import ReportsWidget explicitly
 import '/pages/reports/reports_widget.dart';
 // Import PremiacoesWidget explicitly
@@ -324,6 +326,12 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) {
         path: NotificationsPage.routePath,
         requireAuth: true,
         builder: (context, params) => NotificationsPage(),
+      ),
+      FFRoute(
+        name: BlockedUsersWidget.routeName,
+        path: BlockedUsersWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => BlockedUsersWidget(),
       ),
     ].map((r) => r.toRoute(appStateNotifier)).toList(),
   );

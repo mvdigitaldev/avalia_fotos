@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 import 'storage_service.dart';
+import 'block_service.dart';
 import '../models/photo_model.dart';
 import '../utils/logger.dart';
 import '../utils/error_handler.dart';
@@ -8,6 +9,7 @@ import '../utils/exceptions.dart';
 
 class PhotoService {
   final SupabaseService _supabaseService;
+  BlockService? _blockService;
 
   PhotoService(this._supabaseService);
 
@@ -15,13 +17,28 @@ class PhotoService {
 
   String? get currentUserId => _supabaseService.currentUser?.id;
 
+  /// Define o BlockService para filtrar usuários bloqueados
+  void setBlockService(BlockService blockService) {
+    _blockService = blockService;
+  }
+
   Future<List<PhotoModel>> getFeedPhotos({
     int limit = 20,
     int offset = 0,
   }) async {
     try {
-      // Buscar fotos compartilhadas com informações do usuário
-      final response = await _client
+      // Obter IDs de usuários bloqueados (se houver BlockService)
+      Set<String> blockedUserIds = {};
+      if (_blockService != null && currentUserId != null) {
+        try {
+          blockedUserIds = await _blockService!.getBlockedUserIds();
+        } catch (e) {
+          Logger.warning('Erro ao obter usuários bloqueados, continuando sem filtro', e);
+        }
+      }
+
+      // Se houver usuários bloqueados, aplicar filtro na query
+      var query = _client
           .from('photos')
           .select('''
             *,
@@ -30,7 +47,16 @@ class PhotoService {
               avatar_url
             )
           ''')
-          .eq('is_shared', true)
+          .eq('is_shared', true);
+
+      // Filtrar usuários bloqueados usando NOT IN (se houver bloqueios)
+      if (blockedUserIds.isNotEmpty && currentUserId != null) {
+        // Usar uma subquery para filtrar fotos de usuários bloqueados
+        // Como o Supabase não suporta NOT IN diretamente com subquery, vamos filtrar em memória
+        // Mas primeiro vamos tentar usar uma abordagem com NOT EXISTS via RPC ou filtrar depois
+      }
+
+      final response = await query
           .order('created_at', ascending: false)
           .range(offset, offset + limit - 1);
 
@@ -74,6 +100,11 @@ class PhotoService {
           final userData = item['users'] as Map<String, dynamic>?;
           final photo = PhotoModel.fromJson(item);
           
+          // Filtrar usuários bloqueados em memória
+          if (blockedUserIds.contains(photo.userId)) {
+            continue; // Pular fotos de usuários bloqueados
+          }
+          
           // Verificar se o usuário curtiu usando o Set pré-carregado
           final isLiked = currentUserId != null && likedPhotoIds.contains(photo.id);
 
@@ -101,6 +132,15 @@ class PhotoService {
     bool? isShared,
   }) async {
     try {
+      // Verificar se o usuário está bloqueado
+      if (_blockService != null && currentUserId != null) {
+        final isBlocked = await _blockService!.isUserBlocked(userId);
+        if (isBlocked) {
+          // Retornar lista vazia se o usuário estiver bloqueado
+          return <PhotoModel>[];
+        }
+      }
+
       var query = _client
           .from('photos')
           .select('''
@@ -359,6 +399,16 @@ class PhotoService {
     int offset = 0,
   }) async {
     try {
+      // Obter IDs de usuários bloqueados (se houver BlockService)
+      Set<String> blockedUserIds = {};
+      if (_blockService != null && currentUserId != null) {
+        try {
+          blockedUserIds = await _blockService!.getBlockedUserIds();
+        } catch (e) {
+          Logger.warning('Erro ao obter usuários bloqueados, continuando sem filtro', e);
+        }
+      }
+
       // Construir query base sempre filtrando por is_shared = true
       var query = _client
           .from('photos')
@@ -434,6 +484,11 @@ class PhotoService {
         try {
           final userData = item['users'] as Map<String, dynamic>?;
           final photo = PhotoModel.fromJson(item);
+          
+          // Filtrar usuários bloqueados em memória
+          if (blockedUserIds.contains(photo.userId)) {
+            continue; // Pular fotos de usuários bloqueados
+          }
           
           // Verificar se o usuário curtiu usando o Set pré-carregado
           final isLiked = currentUserId != null && likedPhotoIds.contains(photo.id);
