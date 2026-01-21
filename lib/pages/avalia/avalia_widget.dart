@@ -131,9 +131,6 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
       return;
     }
 
-    // Mostrar intersticial antes de avaliar (para usuários free)
-    await _interstitialAdManager?.showAd();
-
     safeSetState(() {
       _model.isLoading = true;
       _model.errorMessage = null;

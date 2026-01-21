@@ -9,3 +9,5 @@ COMMENT ON COLUMN plans.google_product_id IS 'Product ID do Google Play Console 
 
 
 
+
+

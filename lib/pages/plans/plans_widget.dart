@@ -67,6 +67,32 @@ class _PlansWidgetState extends State<PlansWidget> with TickerProviderStateMixin
         Logger.info('Inicializando In-App Purchase Service...');
         Logger.debug('Plataforma: ${Platform.isIOS ? "iOS" : "Android"}');
         _iapService = InAppPurchaseService(supabaseService);
+
+        // Registrar callbacks para atualizar UI após validação da compra
+        _iapService!.onPurchaseValidated = () async {
+          Logger.info('onPurchaseValidated chamado - recarregando planos...');
+          await _loadPlans();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Assinatura atualizada com sucesso!'),
+                backgroundColor: FlutterFlowTheme.of(context).success,
+              ),
+            );
+          }
+        };
+        _iapService!.onPurchaseValidationError = (message) {
+          Logger.error('Erro de validação de assinatura: $message', null, StackTrace.current);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(message),
+                backgroundColor: FlutterFlowTheme.of(context).error,
+              ),
+            );
+          }
+        };
+
         await _iapService!.initialize();
         Logger.info('In-App Purchase Service inicializado. Disponível: ${_iapService!.isAvailable}');
         if (!_iapService!.isAvailable) {
@@ -419,6 +445,50 @@ class _PlansWidgetState extends State<PlansWidget> with TickerProviderStateMixin
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erro ao abrir link: $e'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Abre Termos de Uso no navegador externo
+  Future<void> _openTerms() async {
+    const termsUrl = 'https://www.avaliafotos.com.br/termos-de-uso';
+    try {
+      final uri = Uri.parse(termsUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        throw 'Não foi possível abrir o link de Termos de Uso';
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao abrir Termos de Uso: $e'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Abre Política de Privacidade no navegador externo
+  Future<void> _openPrivacy() async {
+    const privacyUrl = 'https://www.avaliafotos.com.br/politica-de-privacidade';
+    try {
+      final uri = Uri.parse(privacyUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        throw 'Não foi possível abrir o link de Política de Privacidade';
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao abrir Política de Privacidade: $e'),
             backgroundColor: FlutterFlowTheme.of(context).error,
           ),
         );
@@ -1231,6 +1301,48 @@ class _PlansWidgetState extends State<PlansWidget> with TickerProviderStateMixin
                                 ),
                                 // Agrupar e exibir planos por tipo
                                 ..._buildGroupedPlans(),
+                                const SizedBox(height: 24),
+                                Text(
+                                  'Ao assinar um plano você concorda com nossos Termos de Uso e Política de Privacidade.',
+                                  style: FlutterFlowTheme.of(context).bodySmall.override(
+                                        font: GoogleFonts.poppins(),
+                                        color: FlutterFlowTheme.of(context).secondary,
+                                        letterSpacing: 0.0,
+                                      ),
+                                ),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 12,
+                                  runSpacing: 4,
+                                  children: [
+                                    InkWell(
+                                      onTap: _openTerms,
+                                      child: Text(
+                                        'Ver Termos de Uso',
+                                        style: FlutterFlowTheme.of(context).bodySmall.override(
+                                              font: GoogleFonts.poppins(
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              color: FlutterFlowTheme.of(context).primary,
+                                              letterSpacing: 0.0,
+                                            ),
+                                      ),
+                                    ),
+                                    InkWell(
+                                      onTap: _openPrivacy,
+                                      child: Text(
+                                        'Ver Política de Privacidade',
+                                        style: FlutterFlowTheme.of(context).bodySmall.override(
+                                              font: GoogleFonts.poppins(
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              color: FlutterFlowTheme.of(context).primary,
+                                              letterSpacing: 0.0,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ],
                             ),
                           ),

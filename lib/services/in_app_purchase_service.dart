@@ -17,6 +17,11 @@ class InAppPurchaseService {
   Set<String> _availableProducts = {};
   final Map<String, ProductDetails> _products = {};
 
+  /// Callback opcional para notificar a UI quando uma compra for validada com sucesso
+  VoidCallback? onPurchaseValidated;
+  /// Callback opcional para notificar erro de validação para a UI
+  void Function(String message)? onPurchaseValidationError;
+
   InAppPurchaseService(this._supabaseService);
 
   /// Inicializa o serviço de In-App Purchase
@@ -238,6 +243,8 @@ class InAppPurchaseService {
       }
 
       // Chamar Edge Function para validar
+      Logger.info('Enviando receipt para validate-receipt: platform=$platform, product_id=${purchase.productID}');
+
       final response = await client.functions.invoke(
         'validate-receipt',
         body: {
@@ -249,10 +256,16 @@ class InAppPurchaseService {
       );
 
       if (response.status != 200) {
-        throw Exception('Falha na validação do receipt: ${response.data}');
+        final errorMessage = 'Falha na validação do receipt (status ${response.status}): ${response.data}';
+        Logger.error(errorMessage, null, StackTrace.current);
+        // Notificar UI, se configurado
+        onPurchaseValidationError?.call(errorMessage);
+        throw Exception(errorMessage);
       }
 
-      Logger.info('Compra validada com sucesso: ${purchase.productID}');
+      Logger.info('Compra validada com sucesso no backend: ${purchase.productID}');
+      // Notificar UI de sucesso, se configurado
+      onPurchaseValidated?.call();
     } catch (e, stackTrace) {
       Logger.error('Erro ao validar compra no backend', e, stackTrace);
       rethrow;

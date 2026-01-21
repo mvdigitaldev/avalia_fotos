@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '/flutter_flow/nav/nav.dart';
 import '../services/supabase_service.dart';
@@ -54,6 +55,48 @@ class _SignupWidgetState extends State<SignupWidget> {
   Future<void> _initializeServices() async {
     final supabaseService = await SupabaseService.getInstance();
     _authService = AuthService(supabaseService);
+  }
+
+  Future<void> _openTerms() async {
+    const termsUrl = 'https://www.avaliafotos.com.br/termos-de-uso';
+    try {
+      final uri = Uri.parse(termsUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        throw 'Não foi possível abrir o link de Termos de Uso';
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao abrir Termos de Uso: $e'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _openPrivacy() async {
+    const privacyUrl = 'https://www.avaliafotos.com.br/politica-de-privacidade';
+    try {
+      final uri = Uri.parse(privacyUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        throw 'Não foi possível abrir o link de Política de Privacidade';
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao abrir Política de Privacidade: $e'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _handleSignup() async {
@@ -476,6 +519,68 @@ class _SignupWidgetState extends State<SignupWidget> {
                               ),
                           elevation: 0.0,
                           borderRadius: BorderRadius.circular(8.0),
+                        ),
+                      ),
+                      Padding(
+                        padding: EdgeInsetsDirectional.fromSTEB(0.0, 12.0, 0.0, 0.0),
+                        child: Text.rich(
+                          TextSpan(
+                            text: 'Ao criar uma conta, você concorda com nossos ',
+                            style: FlutterFlowTheme.of(context).bodySmall.override(
+                                  font: GoogleFonts.poppins(),
+                                  color: FlutterFlowTheme.of(context).secondary,
+                                  letterSpacing: 0.0,
+                                ),
+                            children: [
+                              WidgetSpan(
+                                child: InkWell(
+                                  onTap: _openTerms,
+                                  child: Text(
+                                    'Termos de Uso',
+                                    style: FlutterFlowTheme.of(context).bodySmall.override(
+                                          font: GoogleFonts.poppins(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          color: FlutterFlowTheme.of(context).primary,
+                                          letterSpacing: 0.0,
+                                        ),
+                                  ),
+                                ),
+                              ),
+                              TextSpan(
+                                text: ' e ',
+                                style: FlutterFlowTheme.of(context).bodySmall.override(
+                                      font: GoogleFonts.poppins(),
+                                      color: FlutterFlowTheme.of(context).secondary,
+                                      letterSpacing: 0.0,
+                                    ),
+                              ),
+                              WidgetSpan(
+                                child: InkWell(
+                                  onTap: _openPrivacy,
+                                  child: Text(
+                                    'Política de Privacidade',
+                                    style: FlutterFlowTheme.of(context).bodySmall.override(
+                                          font: GoogleFonts.poppins(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          color: FlutterFlowTheme.of(context).primary,
+                                          letterSpacing: 0.0,
+                                        ),
+                                  ),
+                                ),
+                              ),
+                              TextSpan(
+                                text: '.',
+                                style: FlutterFlowTheme.of(context).bodySmall.override(
+                                      font: GoogleFonts.poppins(),
+                                      color: FlutterFlowTheme.of(context).secondary,
+                                      letterSpacing: 0.0,
+                                    ),
+                              ),
+                            ],
+                          ),
+                          textAlign: TextAlign.center,
                         ),
                       ),
                       // Link para voltar ao login

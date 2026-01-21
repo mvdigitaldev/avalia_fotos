@@ -55,7 +55,6 @@ class _FeedWidgetState extends State<FeedWidget> {
   bool _servicesInitialized = false;
   final ScrollController _scrollController = ScrollController();
   String? _currentUsername;
-  int _photoViewsCount = 0; // Contador para intersticiais
   final Map<String, bool> _photoOfDayCache = {}; // Cache de fotos do dia
   
   // Cache manager customizado para fotos
@@ -935,13 +934,6 @@ class _FeedWidgetState extends State<FeedWidget> {
                                 ),
                               // Lista de fotos
                               ..._model.photos.map((photo) {
-                                // Incrementar contador de visualizações e mostrar intersticial a cada 5 fotos
-                                WidgetsBinding.instance.addPostFrameCallback((_) {
-                                  _photoViewsCount++;
-                                  if (_photoViewsCount % 5 == 0) {
-                                    _interstitialAdManager?.showAd();
-                                  }
-                                });
                                 return _buildPhotoCard(photo);
                               }),
                               // Indicador de carregamento ao rolar para baixo
