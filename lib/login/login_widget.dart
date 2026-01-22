@@ -161,6 +161,125 @@ class _LoginWidgetState extends State<LoginWidget> {
     }
   }
 
+  Future<void> _handleForgotPassword() async {
+    final emailController = TextEditingController(text: _model.textController1?.text ?? '');
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Recuperar Senha',
+          style: FlutterFlowTheme.of(context).titleMedium.override(
+                font: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600,
+                ),
+                letterSpacing: 0.0,
+              ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Digite seu email para receber um link de recuperação de senha.',
+              style: FlutterFlowTheme.of(context).bodyMedium.override(
+                    font: GoogleFonts.poppins(),
+                    letterSpacing: 0.0,
+                  ),
+            ),
+            Padding(
+              padding: EdgeInsetsDirectional.fromSTEB(0.0, 16.0, 0.0, 0.0),
+              child: TextField(
+                controller: emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  labelText: 'Email',
+                  hintText: 'seu@email.com',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              final email = emailController.text.trim();
+              if (email.isEmpty || !email.contains('@')) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Por favor, insira um email válido'),
+                    backgroundColor: FlutterFlowTheme.of(context).error,
+                  ),
+                );
+                return;
+              }
+              Navigator.of(context).pop(true);
+            },
+            child: Text(
+              'Enviar',
+              style: TextStyle(
+                color: FlutterFlowTheme.of(context).primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (result != true) return;
+
+    final email = emailController.text.trim();
+
+    if (!_servicesInitialized || _authService == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Aguarde, inicializando serviços...'),
+          backgroundColor: FlutterFlowTheme.of(context).warning,
+        ),
+      );
+      await _initializeServices();
+      if (!_servicesInitialized || _authService == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao inicializar serviços. Por favor, reinicie o app.'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+        return;
+      }
+    }
+
+    try {
+      await _authService!.resetPasswordForEmail(email);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Email de recuperação enviado! Verifique sua caixa de entrada.'),
+            backgroundColor: FlutterFlowTheme.of(context).success,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao enviar email: ${e.toString()}'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     _model.dispose();
@@ -607,13 +726,29 @@ class _LoginWidgetState extends State<LoginWidget> {
                                     mainAxisSize: MainAxisSize.max,
                                     mainAxisAlignment: MainAxisAlignment.end,
                                     children: [
-                                      Text(
-                                        'Esqueceu sua senha?',
-                                        textAlign: TextAlign.center,
-                                        style: FlutterFlowTheme.of(context)
-                                            .bodyMedium
-                                            .override(
-                                              font: GoogleFonts.poppins(
+                                      InkWell(
+                                        onTap: _handleForgotPassword,
+                                        child: Text(
+                                          'Esqueceu sua senha?',
+                                          textAlign: TextAlign.center,
+                                          style: FlutterFlowTheme.of(context)
+                                              .bodyMedium
+                                              .override(
+                                                font: GoogleFonts.poppins(
+                                                  fontWeight:
+                                                      FlutterFlowTheme.of(context)
+                                                          .bodyMedium
+                                                          .fontWeight,
+                                                  fontStyle:
+                                                      FlutterFlowTheme.of(context)
+                                                          .bodyMedium
+                                                          .fontStyle,
+                                                ),
+                                                color:
+                                                    FlutterFlowTheme.of(context)
+                                                        .primary,
+                                                fontSize: 12.0,
+                                                letterSpacing: 0.0,
                                                 fontWeight:
                                                     FlutterFlowTheme.of(context)
                                                         .bodyMedium
@@ -623,20 +758,7 @@ class _LoginWidgetState extends State<LoginWidget> {
                                                         .bodyMedium
                                                         .fontStyle,
                                               ),
-                                              color:
-                                                  FlutterFlowTheme.of(context)
-                                                      .secondary,
-                                              fontSize: 12.0,
-                                              letterSpacing: 0.0,
-                                              fontWeight:
-                                                  FlutterFlowTheme.of(context)
-                                                      .bodyMedium
-                                                      .fontWeight,
-                                              fontStyle:
-                                                  FlutterFlowTheme.of(context)
-                                                      .bodyMedium
-                                                      .fontStyle,
-                                            ),
+                                        ),
                                       ),
                                     ],
                                   ),

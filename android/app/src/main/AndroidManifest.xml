@@ -58,6 +58,16 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="avaliafotos" android:host="avaliafotos.com" />
             </intent-filter>
+            <!-- App Links - Links HTTP para abrir app quando instalado -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="avaliafotos.com.br"
+                    android:pathPrefix="/p" />
+            </intent-filter>
 
         </activity>
 

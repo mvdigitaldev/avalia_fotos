@@ -140,3 +140,4 @@ COMMENT ON FUNCTION get_pending_reports_count() IS 'Retorna a quantidade de den√
 
 
 
+

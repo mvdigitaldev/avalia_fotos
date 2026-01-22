@@ -29,7 +29,7 @@ class ShareBottomSheet extends StatelessWidget {
   }
 
   static String _generatePhotoLink(String photoId) {
-    return 'avaliafotos://avaliafotos.com/photo-detail/$photoId';
+    return 'https://avaliafotos.com.br/p/$photoId';
   }
 
   Future<void> _shareOnWhatsApp() async {

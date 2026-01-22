@@ -23,6 +23,7 @@ class PerfilModel extends FlutterFlowModel<PerfilWidget> {
   bool isLoading = true;
   bool isUpdatingAvatar = false;
   bool isUpdatingUsername = false;
+  bool isChangingPassword = false;
   bool isDeletingAccount = false;
   String? errorMessage;
 

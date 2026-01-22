@@ -45,6 +45,8 @@ import '/pages/premiacoes/premiacoes_widget.dart';
 import '/pages/admin/select_photo_of_day_widget.dart';
 // Import SendPushNotificationWidget explicitly
 import '/pages/admin/send_push_notification_widget.dart';
+// Import ResetPasswordWidget explicitly
+import '/pages/reset_password/reset_password_widget.dart';
 
 export 'package:go_router/go_router.dart';
 export 'serialization_util.dart';
@@ -78,6 +80,15 @@ class AppStateNotifier extends ChangeNotifier {
       _authSubscription = service.authStateChanges.listen((authState) async {
         // Notificar listeners quando o estado de autenticação mudar
         notifyListeners();
+        
+        // Detectar evento de recuperação de senha e redirecionar
+        if (authState.event == AuthChangeEvent.passwordRecovery) {
+          Logger.info('Evento PASSWORD_RECOVERY detectado, redirecionando para reset-password');
+          // Usar o router global para navegar
+          Future.microtask(() {
+            appNavigatorKey.currentState?.context.go('/reset-password');
+          });
+        }
         
         // Gerenciar token de notificação quando usuário faz login/logout
         if (!kIsWeb) {
@@ -160,13 +171,50 @@ class AppStateNotifier extends ChangeNotifier {
 }
 
 GoRouter createRouter(AppStateNotifier appStateNotifier) {
+  // Detectar deep link HTTP inicial (Universal Links / App Links)
+  String? initialDeepLink;
+  try {
+    // Tentar obter URL inicial do deep link
+    // Em mobile, quando app é aberto via link HTTP, a URL pode estar disponível
+    // através de diferentes métodos dependendo da plataforma
+    if (!kIsWeb) {
+      // Para mobile, o GoRouter pode receber a URL através do sistema operacional
+      // Vamos verificar se há uma rota inicial customizada
+      // A detecção real acontece quando o app é aberto via link
+    }
+    
+    // Para web, podemos verificar a URL atual
+    if (kIsWeb) {
+      final uri = Uri.base;
+      if (uri.host == 'avaliafotos.com.br' && uri.path.startsWith('/p/')) {
+        final photoId = uri.path.split('/p/')[1]?.split('?')[0];
+        if (photoId != null && photoId.isNotEmpty) {
+          initialDeepLink = '/photo-detail/$photoId';
+          Logger.info('Deep link HTTP detectado: /p/$photoId -> /photo-detail/$photoId');
+        }
+      }
+    }
+  } catch (e) {
+    Logger.debug('Erro ao detectar deep link inicial', e);
+  }
+
   return GoRouter(
-    initialLocation: '/',
+    initialLocation: initialDeepLink ?? '/',
     debugLogDiagnostics: true,
     refreshListenable: appStateNotifier,
     navigatorKey: appNavigatorKey,
       redirect: (context, state) {
         try {
+          // Detectar deep link HTTP (/p/{photoId}) e converter para rota interna
+          final uri = state.uri;
+          if (uri.path.startsWith('/p/')) {
+            final photoId = uri.path.split('/p/')[1]?.split('?')[0];
+            if (photoId != null && photoId.isNotEmpty) {
+              Logger.info('Deep link HTTP detectado: /p/$photoId -> redirecionando para /photo-detail/$photoId');
+              return '/photo-detail/$photoId';
+            }
+          }
+
           // Verificar se o usuário está autenticado
           // Usar try-catch porque Supabase pode não estar inicializado ainda
           final isAuthenticated = SupabaseService.isAuthenticated;
@@ -278,6 +326,12 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) {
           path: SignupWidget.routePath,
           requireAuth: false,
           builder: (context, params) => SignupWidget(),
+        ),
+        FFRoute(
+          name: ResetPasswordWidget.routeName,
+          path: ResetPasswordWidget.routePath,
+          requireAuth: false,
+          builder: (context, params) => ResetPasswordWidget(),
         ),
       FFRoute(
         name: PhotoDetailWidget.routeName,

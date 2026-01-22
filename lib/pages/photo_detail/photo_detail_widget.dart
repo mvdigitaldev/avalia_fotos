@@ -483,7 +483,6 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
   Widget _buildPhotoImage() {
     return Container(
       width: double.infinity,
-      height: MediaQuery.of(context).size.height * 0.4,
       decoration: BoxDecoration(
         color: FlutterFlowTheme.of(context).alternate,
       ),
@@ -491,37 +490,40 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
           ? Stack(
               children: [
                 CachedNetworkImage(
-              imageUrl: _model.photo!.imageUrl,
-              width: double.infinity,
-              height: MediaQuery.of(context).size.height * 0.4,
-              fit: BoxFit.cover,
-              cacheManager: _photoCacheManager,
-              placeholder: (context, url) => Container(
-                width: double.infinity,
-                height: MediaQuery.of(context).size.height * 0.4,
-                decoration: BoxDecoration(
-                  color: FlutterFlowTheme.of(context).alternate,
-                ),
-                child: Center(
-                  child: CircularProgressIndicator(
-                    color: FlutterFlowTheme.of(context).primary,
+                  imageUrl: _model.photo!.imageUrl,
+                  width: double.infinity,
+                  fit: BoxFit.fitWidth,
+                  cacheManager: _photoCacheManager,
+                  placeholder: (context, url) => Container(
+                    width: double.infinity,
+                    constraints: BoxConstraints(
+                      minHeight: 200,
+                    ),
+                    decoration: BoxDecoration(
+                      color: FlutterFlowTheme.of(context).alternate,
+                    ),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: FlutterFlowTheme.of(context).primary,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              errorWidget: (context, url, error) => Container(
-                width: double.infinity,
-                height: MediaQuery.of(context).size.height * 0.4,
-                decoration: BoxDecoration(
-                  color: FlutterFlowTheme.of(context).alternate,
-                ),
-                child: Center(
-                  child: Icon(
-                    Icons.broken_image_outlined,
-                    size: 48,
-                    color: FlutterFlowTheme.of(context).secondary,
+                  errorWidget: (context, url, error) => Container(
+                    width: double.infinity,
+                    constraints: BoxConstraints(
+                      minHeight: 200,
+                    ),
+                    decoration: BoxDecoration(
+                      color: FlutterFlowTheme.of(context).alternate,
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.broken_image_outlined,
+                        size: 48,
+                        color: FlutterFlowTheme.of(context).secondary,
+                      ),
+                    ),
                   ),
-                ),
-              ),
                 ),
                 // Badge de troféu se for foto do dia
                 if (_isPhotoOfDay == true)
@@ -536,7 +538,9 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
             )
           : Container(
               width: double.infinity,
-              height: MediaQuery.of(context).size.height * 0.4,
+              constraints: BoxConstraints(
+                minHeight: 200,
+              ),
               color: FlutterFlowTheme.of(context).alternate,
               child: Center(
                 child: Icon(

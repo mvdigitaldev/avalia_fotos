@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'supabase_service.dart';
 import 'notification_service.dart';
 import '../models/user_model.dart';
@@ -292,6 +293,67 @@ class AuthService {
       await _client.from('users').update(updates).eq('id', user.id);
 
       return (await getCurrentUserProfile())!;
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<void> updatePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final user = currentUser;
+      if (user == null) {
+        throw Exception('Usuário não autenticado');
+      }
+
+      // Validar nova senha
+      if (newPassword.length < 6) {
+        throw Exception('A nova senha deve ter pelo menos 6 caracteres');
+      }
+
+      // Verificar senha atual tentando fazer login
+      try {
+        await _client.auth.signInWithPassword(
+          email: user.email!,
+          password: currentPassword,
+        );
+      } catch (e) {
+        throw Exception('Senha atual incorreta');
+      }
+
+      // Atualizar senha
+      await _client.auth.updateUser(
+        UserAttributes(password: newPassword),
+      );
+
+      Logger.info('Senha atualizada com sucesso');
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<void> resetPasswordForEmail(String email) async {
+    try {
+      // Validar formato do email
+      if (email.isEmpty || !email.contains('@')) {
+        throw Exception('Por favor, insira um email válido');
+      }
+
+      // Configurar redirectTo para deep link do app
+      // Para mobile: avaliafotos://avaliafotos.com/reset-password
+      // Para web: usar URL do site configurada no Supabase
+      final redirectTo = kIsWeb 
+          ? '${Uri.base.origin}/reset-password'
+          : 'avaliafotos://avaliafotos.com/reset-password';
+
+      await _client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: redirectTo,
+      );
+
+      Logger.info('Email de recuperação de senha enviado para: $email');
     } catch (e) {
       throw _handleError(e);
     }

@@ -287,6 +287,242 @@ class _PerfilWidgetState extends State<PerfilWidget> {
     }
   }
 
+  Future<void> _changePassword() async {
+    final currentPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    bool currentPasswordVisible = false;
+    bool newPasswordVisible = false;
+    bool confirmPasswordVisible = false;
+
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Container(
+            padding: EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 20.0),
+            decoration: BoxDecoration(
+              color: FlutterFlowTheme.of(context).secondaryBackground,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20.0),
+                topRight: Radius.circular(20.0),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Alterar Senha',
+                  style: FlutterFlowTheme.of(context).titleLarge.override(
+                        font: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        letterSpacing: 0.0,
+                      ),
+                ),
+                Padding(
+                  padding: EdgeInsetsDirectional.fromSTEB(0.0, 16.0, 0.0, 0.0),
+                  child: TextField(
+                    controller: currentPasswordController,
+                    obscureText: !currentPasswordVisible,
+                    decoration: InputDecoration(
+                      labelText: 'Senha Atual',
+                      hintText: 'Digite sua senha atual',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                      ),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          currentPasswordVisible
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            currentPasswordVisible = !currentPasswordVisible;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsetsDirectional.fromSTEB(0.0, 16.0, 0.0, 0.0),
+                  child: TextField(
+                    controller: newPasswordController,
+                    obscureText: !newPasswordVisible,
+                    decoration: InputDecoration(
+                      labelText: 'Nova Senha',
+                      hintText: 'Digite sua nova senha',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                      ),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          newPasswordVisible
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            newPasswordVisible = !newPasswordVisible;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsetsDirectional.fromSTEB(0.0, 16.0, 0.0, 16.0),
+                  child: TextField(
+                    controller: confirmPasswordController,
+                    obscureText: !confirmPasswordVisible,
+                    decoration: InputDecoration(
+                      labelText: 'Confirmar Nova Senha',
+                      hintText: 'Digite novamente a nova senha',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                      ),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          confirmPasswordVisible
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            confirmPasswordVisible = !confirmPasswordVisible;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: Text('Cancelar'),
+                    ),
+                    SizedBox(width: 8.0),
+                    FFButtonWidget(
+                      onPressed: () async {
+                        final currentPassword = currentPasswordController.text.trim();
+                        final newPassword = newPasswordController.text.trim();
+                        final confirmPassword = confirmPasswordController.text.trim();
+
+                        if (currentPassword.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Por favor, digite sua senha atual'),
+                              backgroundColor: FlutterFlowTheme.of(context).error,
+                            ),
+                          );
+                          return;
+                        }
+
+                        if (newPassword.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Por favor, digite a nova senha'),
+                              backgroundColor: FlutterFlowTheme.of(context).error,
+                            ),
+                          );
+                          return;
+                        }
+
+                        if (newPassword.length < 6) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('A nova senha deve ter pelo menos 6 caracteres'),
+                              backgroundColor: FlutterFlowTheme.of(context).error,
+                            ),
+                          );
+                          return;
+                        }
+
+                        if (newPassword != confirmPassword) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('As senhas não coincidem'),
+                              backgroundColor: FlutterFlowTheme.of(context).error,
+                            ),
+                          );
+                          return;
+                        }
+
+                        Navigator.of(context).pop(true);
+                      },
+                      text: 'Salvar',
+                      options: FFButtonOptions(
+                        height: 40.0,
+                        padding: EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 0.0),
+                        color: FlutterFlowTheme.of(context).primary,
+                        textStyle: FlutterFlowTheme.of(context).titleSmall.override(
+                              font: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w600,
+                              ),
+                              color: Colors.white,
+                              letterSpacing: 0.0,
+                            ),
+                        borderRadius: BorderRadius.circular(8.0),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (result != true) return;
+
+    safeSetState(() {
+      _model.isChangingPassword = true;
+    });
+
+    try {
+      await _authService.updatePassword(
+        currentPassword: currentPasswordController.text.trim(),
+        newPassword: newPasswordController.text.trim(),
+      );
+
+      safeSetState(() {
+        _model.isChangingPassword = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Senha alterada com sucesso!'),
+            backgroundColor: FlutterFlowTheme.of(context).success,
+          ),
+        );
+      }
+    } catch (e) {
+      safeSetState(() {
+        _model.isChangingPassword = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao alterar senha: $e'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _showDeleteAccountDialog() async {
     final confirmController = TextEditingController();
     bool canDelete = false;
@@ -868,12 +1104,21 @@ class _PerfilWidgetState extends State<PerfilWidget> {
                               child: Column(
                                 children: [
                                   FFButtonWidget(
-                                    onPressed: _handleLogout,
-                                    text: 'Sair',
-                                    icon: Icon(
-                                      Icons.logout,
-                                      size: 20,
-                                    ),
+                                    onPressed: _model.isChangingPassword ? null : _changePassword,
+                                    text: _model.isChangingPassword ? 'Alterando...' : 'Alterar Senha',
+                                    icon: _model.isChangingPassword
+                                        ? SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: FlutterFlowTheme.of(context).primaryText,
+                                            ),
+                                          )
+                                        : Icon(
+                                            Icons.lock_outline,
+                                            size: 20,
+                                          ),
                                     options: FFButtonOptions(
                                       width: double.infinity,
                                       height: 50.0,
@@ -891,6 +1136,37 @@ class _PerfilWidgetState extends State<PerfilWidget> {
                                       borderSide: BorderSide(
                                         color: FlutterFlowTheme.of(context).alternate,
                                         width: 1.0,
+                                      ),
+                                      disabledColor: FlutterFlowTheme.of(context).alternate,
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: EdgeInsetsDirectional.fromSTEB(0.0, 16.0, 0.0, 0.0),
+                                    child: FFButtonWidget(
+                                      onPressed: _handleLogout,
+                                      text: 'Sair',
+                                      icon: Icon(
+                                        Icons.logout,
+                                        size: 20,
+                                      ),
+                                      options: FFButtonOptions(
+                                        width: double.infinity,
+                                        height: 50.0,
+                                        padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 0.0),
+                                        iconPadding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 0.0),
+                                        color: FlutterFlowTheme.of(context).secondaryBackground,
+                                        textStyle: FlutterFlowTheme.of(context).titleSmall.override(
+                                              font: GoogleFonts.poppins(
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              color: FlutterFlowTheme.of(context).primaryText,
+                                              letterSpacing: 0.0,
+                                            ),
+                                        borderRadius: BorderRadius.circular(12.0),
+                                        borderSide: BorderSide(
+                                          color: FlutterFlowTheme.of(context).alternate,
+                                          width: 1.0,
+                                        ),
                                       ),
                                     ),
                                   ),
