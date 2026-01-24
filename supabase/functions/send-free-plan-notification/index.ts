@@ -147,107 +147,224 @@ async function sendFCMNotification(accessToken, projectId, token, title, body, d
 
 Deno.serve(async (req) => {
   try {
+    console.log('[STEP 0] Iniciando Edge Function send-free-plan-notification');
+    
     // Verificar método
     if (req.method !== 'POST') {
-      return new Response('Method not allowed', { status: 405 });
+      console.error('[ERROR] Método não permitido:', req.method);
+      return new Response(JSON.stringify({ error: 'Method not allowed' }), { 
+        status: 405,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
-    // Obter credenciais do Firebase
+    // STEP 1: Verificar variáveis de ambiente
+    console.log('[STEP 1] Verificando variáveis de ambiente...');
+    
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    if (!supabaseUrl || supabaseUrl.trim() === '') {
+      console.error('[ERROR] SUPABASE_URL não configurado ou vazio');
+      throw new Error('SUPABASE_URL não configurado. Configure no Supabase Dashboard > Edge Functions > Secrets');
+    }
+    console.log(`[INFO] SUPABASE_URL configurado: ${supabaseUrl.substring(0, 30)}...`);
+
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseServiceKey || supabaseServiceKey.trim() === '') {
+      console.error('[ERROR] SUPABASE_SERVICE_ROLE_KEY não configurado ou vazio');
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY não configurado. Configure no Supabase Dashboard > Edge Functions > Secrets');
+    }
+    console.log(`[INFO] SUPABASE_SERVICE_ROLE_KEY configurado: ${supabaseServiceKey.substring(0, 20)}...`);
+
     const serviceAccountJson = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_JSON');
-    if (!serviceAccountJson) {
-      throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON não configurado');
+    if (!serviceAccountJson || serviceAccountJson.trim() === '') {
+      console.error('[ERROR] FIREBASE_SERVICE_ACCOUNT_JSON não configurado ou vazio');
+      throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON não configurado. Configure no Supabase Dashboard > Edge Functions > Secrets');
+    }
+    console.log(`[INFO] FIREBASE_SERVICE_ACCOUNT_JSON configurado: ${serviceAccountJson.length} caracteres`);
+
+    // STEP 2: Parse do Firebase Service Account JSON
+    console.log('[STEP 2] Fazendo parse do Firebase Service Account JSON...');
+    
+    let serviceAccount;
+    try {
+      serviceAccount = JSON.parse(serviceAccountJson);
+      
+      // Validar campos obrigatórios
+      if (!serviceAccount.client_email) {
+        throw new Error('Campo client_email não encontrado no Firebase Service Account JSON');
+      }
+      if (!serviceAccount.private_key) {
+        throw new Error('Campo private_key não encontrado no Firebase Service Account JSON');
+      }
+      if (!serviceAccount.project_id) {
+        throw new Error('Campo project_id não encontrado no Firebase Service Account JSON');
+      }
+      if (!serviceAccount.token_uri) {
+        throw new Error('Campo token_uri não encontrado no Firebase Service Account JSON');
+      }
+      
+      console.log(`[INFO] Firebase Service Account válido: project_id=${serviceAccount.project_id}, client_email=${serviceAccount.client_email}`);
+    } catch (parseError) {
+      console.error('[ERROR] Erro ao fazer parse do FIREBASE_SERVICE_ACCOUNT_JSON:', parseError.message);
+      console.error('[ERROR] Stack trace:', parseError.stack);
+      throw new Error(`Erro ao processar Firebase Service Account: ${parseError.message}. Verifique se o JSON está válido.`);
     }
 
-    const serviceAccount = JSON.parse(serviceAccountJson);
-
-    // Inicializar Supabase Client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    // STEP 3: Inicializar cliente Supabase
+    console.log('[STEP 3] Inicializando cliente Supabase...');
+    
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    console.log('[INFO] Cliente Supabase inicializado com sucesso');
 
-    // Buscar todos os usuários com plano free
-    // Um usuário é considerado free se:
-    // 1. Não tem plano ativo, OU
-    // 2. Tem plano ativo mas o plano tem price = null (grátis)
+    // STEP 4: Buscar usuários free
+    console.log('[STEP 4] Buscando usuários com plano free...');
+    
     const { data: freeUsers, error: usersError } = await supabase.rpc('get_free_plan_users');
 
     if (usersError) {
-      throw new Error(`Erro ao buscar usuários free: ${usersError.message}`);
+      console.error('[ERROR] Erro ao chamar get_free_plan_users:', {
+        message: usersError.message,
+        details: usersError.details,
+        hint: usersError.hint,
+        code: usersError.code
+      });
+      throw new Error(`Erro ao buscar usuários free: ${usersError.message} (code: ${usersError.code || 'unknown'})`);
     }
 
     if (!freeUsers || freeUsers.length === 0) {
-      console.log('Nenhum usuário com plano free encontrado');
+      console.log('[INFO] Nenhum usuário com plano free encontrado');
       return new Response(JSON.stringify({
         message: 'Nenhum usuário com plano free encontrado',
-        sent: 0
+        sent: 0,
+        totalUsers: 0
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    console.log(`Encontrados ${freeUsers.length} usuários com plano free`);
+    console.log(`[INFO] Encontrados ${freeUsers.length} usuários com plano free`);
 
-    // Buscar todos os tokens dos usuários free
-    // A função RPC retorna um array de objetos com { user_id: UUID }
-    const userIds = freeUsers.map((u: any) => {
-      // A função retorna uma tabela, então pode vir como { user_id: ... } ou diretamente como UUID
-      return typeof u === 'object' && u !== null ? u.user_id : u;
-    }).filter((id: any) => id != null);
+    // STEP 5: Processar userIds e buscar tokens
+    console.log('[STEP 5] Processando userIds e buscando tokens...');
+    
+    // Validar formato dos userIds retornados
+    const userIds = freeUsers
+      .map((u: any) => {
+        if (typeof u === 'object' && u !== null && u.user_id) {
+          return u.user_id;
+        } else if (typeof u === 'string') {
+          return u;
+        }
+        return null;
+      })
+      .filter((id: any) => id != null && typeof id === 'string');
+    
+    if (userIds.length === 0 && freeUsers.length > 0) {
+      console.warn('[WARN] Formato inesperado dos dados de get_free_plan_users:', JSON.stringify(freeUsers.slice(0, 3)));
+      return new Response(JSON.stringify({
+        message: 'Formato inesperado dos dados de usuários free',
+        sent: 0,
+        totalUsers: freeUsers.length,
+        validUserIds: 0
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    console.log(`[INFO] ${userIds.length} userIds válidos extraídos de ${freeUsers.length} usuários`);
+
     const { data: tokens, error: tokensError } = await supabase
       .from('device_tokens')
       .select('token, platform, user_id')
       .in('user_id', userIds);
 
     if (tokensError) {
-      throw new Error(`Erro ao buscar tokens: ${tokensError.message}`);
+      console.error('[ERROR] Erro ao buscar tokens:', {
+        message: tokensError.message,
+        details: tokensError.details,
+        hint: tokensError.hint,
+        code: tokensError.code
+      });
+      throw new Error(`Erro ao buscar tokens: ${tokensError.message} (code: ${tokensError.code || 'unknown'})`);
     }
 
     if (!tokens || tokens.length === 0) {
-      console.log('Nenhum token encontrado para usuários free');
+      console.log('[INFO] Nenhum token encontrado para usuários free');
       return new Response(JSON.stringify({
         message: 'Nenhum token encontrado para usuários free',
-        sent: 0
+        sent: 0,
+        totalUsers: freeUsers.length,
+        totalTokens: 0
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    console.log(`Encontrados ${tokens.length} tokens para enviar notificações`);
+    console.log(`[INFO] Encontrados ${tokens.length} tokens para enviar notificações`);
 
-    // Gerar access token OAuth2
-    const accessToken = await getAccessToken(serviceAccount);
+    // STEP 6: Gerar access token OAuth2
+    console.log('[STEP 6] Gerando access token Firebase OAuth2...');
+    
+    let accessToken;
+    try {
+      accessToken = await getAccessToken(serviceAccount);
+      console.log('[INFO] Access token Firebase obtido com sucesso');
+    } catch (tokenError) {
+      console.error('[ERROR] Erro ao obter access token Firebase:', tokenError.message);
+      console.error('[ERROR] Stack trace:', tokenError.stack);
+      throw new Error(`Erro ao obter access token Firebase: ${tokenError.message}`);
+    }
 
+    // STEP 7: Enviar notificações
+    console.log('[STEP 7] Enviando notificações...');
+    
     // Mensagem da notificação
     const title = 'Desbloqueie recursos exclusivos!';
     const body = 'Assine um plano pago e tenha acesso a recursos premium. Clique para ver os planos disponíveis.';
     const notificationData = {
       type: 'upgrade_plan',
-      deep_link: '/plans'
+      deep_link: '/plans_assas'
     };
 
     // Enviar notificação para cada token
-    const results = await Promise.allSettled(tokens.map(async (tokenData) => {
-      return await sendFCMNotification(
-        accessToken, 
-        serviceAccount.project_id, 
-        tokenData.token, 
-        title, 
-        body, 
-        notificationData
-      );
+    const results = await Promise.allSettled(tokens.map(async (tokenData, index) => {
+      try {
+        if (!tokenData.token || typeof tokenData.token !== 'string') {
+          throw new Error(`Token inválido no índice ${index}`);
+        }
+        return await sendFCMNotification(
+          accessToken, 
+          serviceAccount.project_id, 
+          tokenData.token, 
+          title, 
+          body, 
+          notificationData
+        );
+      } catch (tokenError) {
+        console.error(`[ERROR] Erro ao enviar notificação para token ${index}:`, tokenError.message);
+        throw tokenError;
+      }
     }));
 
     const successful = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(r => r.status === 'rejected').length;
 
-    // Log de erros para debug
+    // Log detalhado de erros para debug
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        console.error(`Erro ao enviar notificação para token ${index}:`, result.reason);
+        const error = result.reason;
+        console.error(`[ERROR] Falha ao enviar notificação para token ${index}:`, {
+          message: error.message,
+          token: tokens[index]?.token?.substring(0, 20) + '...',
+          userId: tokens[index]?.user_id
+        });
       }
     });
+
+    console.log(`[SUCCESS] Processo concluído: ${successful} sucesso, ${failed} falhas`);
 
     return new Response(JSON.stringify({
       message: `Notificações enviadas: ${successful} sucesso, ${failed} falhas`,
@@ -263,9 +380,12 @@ Deno.serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Erro ao enviar notificações para usuários free:', error);
+    console.error('[ERROR] Erro crítico ao enviar notificações para usuários free:', error.message);
+    console.error('[ERROR] Stack trace:', error.stack);
+    
     return new Response(JSON.stringify({
-      error: error.message
+      error: error.message,
+      step: 'Verifique os logs para mais detalhes'
     }), {
       status: 500,
       headers: {

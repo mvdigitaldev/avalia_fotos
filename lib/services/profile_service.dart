@@ -346,5 +346,38 @@ class ProfileService {
       throw Exception('Erro ao buscar estatísticas do perfil: $e');
     }
   }
+
+  /// Busca dados públicos do perfil de um usuário (para visualização de perfil)
+  Future<Map<String, dynamic>> getUserPublicProfile(String userId) async {
+    try {
+      // Buscar dados do usuário
+      final userResponse = await _client
+          .from('users')
+          .select('username, avatar_url, total_score')
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (userResponse == null) {
+        throw Exception('Usuário não encontrado');
+      }
+
+      // Contar total de fotos avaliadas
+      final totalPhotos = await _photoService.getUserPhotosCount(userId: userId);
+
+      // Contar fotos compartilhadas
+      final sharedPhotosCount = await _photoService.getUserSharedPhotosCount(userId);
+
+      return {
+        'username': userResponse['username'] as String?,
+        'avatar_url': userResponse['avatar_url'] as String?,
+        'total_score': (userResponse['total_score'] ?? 0).toDouble(),
+        'total_photos_evaluated': totalPhotos,
+        'shared_photos_count': sharedPhotosCount,
+      };
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao buscar perfil público do usuário', e, stackTrace);
+      throw Exception('Erro ao buscar perfil: $e');
+    }
+  }
 }
 

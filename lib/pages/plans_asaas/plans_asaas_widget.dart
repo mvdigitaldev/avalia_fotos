@@ -11,8 +11,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/supabase_service.dart';
 import '../../services/plan_service.dart';
 import '../../services/payment_service.dart';
-import '../../services/asaas_service.dart';
-import '../../components/asaas_payment_dialog.dart';
 import '../../utils/logger.dart';
 import '../../models/plan_model.dart';
 import '../../models/user_plan_model.dart';
@@ -36,9 +34,7 @@ class _PlansAsaasWidgetState extends State<PlansAsaasWidget> with TickerProvider
   final scaffoldKey = GlobalKey<ScaffoldState>();
   late PlanService _planService;
   late PaymentService _paymentService;
-  late AsaasService _asaasService;
   bool _servicesInitialized = false;
-  bool _isPurchasing = false;
 
   @override
   void initState() {
@@ -60,7 +56,6 @@ class _PlansAsaasWidgetState extends State<PlansAsaasWidget> with TickerProvider
       final supabaseService = await SupabaseService.getInstance();
       _planService = PlanService(supabaseService);
       _paymentService = PaymentService(supabaseService);
-      _asaasService = AsaasService(supabaseService);
       
       setState(() {
         _servicesInitialized = true;
@@ -130,13 +125,8 @@ class _PlansAsaasWidgetState extends State<PlansAsaasWidget> with TickerProvider
     }
   }
 
-  /// Compra um plano via Asaas
+  /// Abre checkout externo do plano
   Future<void> _purchasePlan(PlanModel plan) async {
-    if (_isPurchasing) {
-      Logger.warning('Já existe uma compra em andamento');
-      return;
-    }
-
     final userId = _planService.currentUserId;
     if (userId == null) {
       if (mounted) {
@@ -150,100 +140,45 @@ class _PlansAsaasWidgetState extends State<PlansAsaasWidget> with TickerProvider
       return;
     }
 
-    // Exibir dialog para coletar dados
-    final userData = await showDialog<Map<String, String>>(
-      context: context,
-      builder: (context) => const AsaasPaymentDialog(),
-    );
-
-    if (userData == null) {
-      // Usuário cancelou
-      return;
-    }
-
-    safeSetState(() {
-      _isPurchasing = true;
-    });
-
-    try {
-      Logger.info('Iniciando compra do plano via Asaas: ${plan.name}');
-
-      // 1. Verificar/Criar cliente no Asaas
-      final customerId = await _asaasService.getOrCreateCustomer(
-        userId,
-        userData['name']!,
-        userData['email']!,
-        userData['cpf']!,
-      );
-
-      // 2. Criar cobrança no Asaas
-      final paymentData = await _asaasService.createPayment(
-        customerId,
-        plan.id,
-        plan,
-      );
-
-      // 3. Criar registro inicial em payment_history com status pending
-      final expiresAt = plan.durationMonths != null
-          ? DateTime.now().add(Duration(days: plan.durationMonths! * 30))
-          : DateTime.now().add(const Duration(days: 30));
-
-      final supabaseService = await SupabaseService.getInstance();
-      final client = supabaseService.client;
-      
-      await client.from('payment_history').insert({
-        'user_id': userId,
-        'plan_id': plan.id,
-        'amount': plan.price ?? 0,
-        'payment_status': 'pending',
-        'payment_method': 'pix',
-        'payment_gateway': 'asaas',
-        'transaction_id': paymentData['id'],
-        'invoice_url': paymentData['invoiceUrl'],
-        'expires_at': expiresAt.toIso8601String(),
-        'currency': 'BRL',
-        'description': 'Plano ${plan.name}',
-      });
-
-      Logger.info('Registro de pagamento criado com transaction_id: ${paymentData['id']}');
-
-      // 4. Redirecionar para invoiceUrl
-      final invoiceUrl = paymentData['invoiceUrl'] as String?;
-      if (invoiceUrl != null && invoiceUrl.isNotEmpty) {
-        final uri = Uri.parse(invoiceUrl);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        }
-      }
-
-      // 5. Exibir mensagem informativa
+    // Verificar se o plano tem link_plan configurado
+    if (plan.linkPlan == null || plan.linkPlan!.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Pagamento gerado com sucesso! Você será redirecionado para finalizar o pagamento. O plano será ativado após confirmação.'),
-            backgroundColor: FlutterFlowTheme.of(context).success,
-            duration: const Duration(seconds: 5),
+            content: Text('Link do checkout não configurado para este plano'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
           ),
         );
       }
+      Logger.error('Plano ${plan.id} não possui link_plan configurado');
+      return;
+    }
 
-      // Recarregar histórico de pagamentos
-      await _loadPaymentHistory();
+    try {
+      // Construir URL com parâmetros
+      final baseUrl = plan.linkPlan!.trim();
+      final uri = Uri.parse(baseUrl).replace(
+        queryParameters: {
+          'plan_id': plan.id,
+          'user_id': userId,
+        },
+      );
+
+      Logger.info('Navegando para checkout WebView: ${uri.toString()}');
+
+      // Navegar para página de WebView dentro do app
+      context.push('/checkout-webview?url=${Uri.encodeComponent(uri.toString())}');
     } catch (e, stackTrace) {
-      Logger.error('Erro ao comprar plano via Asaas', e, stackTrace);
+      Logger.error('Erro ao abrir checkout externo', e, stackTrace);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao processar pagamento: ${e.toString()}'),
+            content: Text('Erro ao abrir checkout: ${e.toString()}'),
             backgroundColor: FlutterFlowTheme.of(context).error,
             duration: const Duration(seconds: 4),
           ),
         );
       }
-    } finally {
-      safeSetState(() {
-        _isPurchasing = false;
-      });
     }
   }
 
@@ -338,6 +273,8 @@ class _PlansAsaasWidgetState extends State<PlansAsaasWidget> with TickerProvider
 
   Widget _buildPlanCard(PlanModel plan) {
     final isCurrentPlan = _model.currentPlan?.plan.id == plan.id;
+    final isFreeUser = _model.currentPlan?.plan.isFree ?? true;
+    final isRecommended = isFreeUser && !plan.isFree && plan.durationMonths == 6; // Plano semestral como recomendado
     
     return Container(
       margin: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 16),
@@ -347,8 +284,10 @@ class _PlansAsaasWidgetState extends State<PlansAsaasWidget> with TickerProvider
         border: Border.all(
           color: isCurrentPlan
               ? FlutterFlowTheme.of(context).primary
-              : FlutterFlowTheme.of(context).alternate,
-          width: isCurrentPlan ? 2 : 1,
+              : isRecommended
+                  ? FlutterFlowTheme.of(context).primary.withOpacity(0.5)
+                  : FlutterFlowTheme.of(context).alternate,
+          width: isCurrentPlan ? 2 : isRecommended ? 2 : 1,
         ),
       ),
       child: Padding(
@@ -363,14 +302,40 @@ class _PlansAsaasWidgetState extends State<PlansAsaasWidget> with TickerProvider
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        plan.name,
-                        style: FlutterFlowTheme.of(context).headlineSmall.override(
-                              font: GoogleFonts.poppins(
-                                fontWeight: FontWeight.bold,
+                      Row(
+                        children: [
+                          Text(
+                            plan.name,
+                            style: FlutterFlowTheme.of(context).headlineSmall.override(
+                                  font: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  letterSpacing: 0.0,
+                                ),
+                          ),
+                          if (isRecommended)
+                            Padding(
+                              padding: EdgeInsetsDirectional.fromSTEB(8, 0, 0, 0),
+                              child: Container(
+                                padding: EdgeInsetsDirectional.fromSTEB(8, 4, 8, 4),
+                                decoration: BoxDecoration(
+                                  color: FlutterFlowTheme.of(context).primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Recomendado',
+                                  style: FlutterFlowTheme.of(context).bodySmall.override(
+                                        font: GoogleFonts.poppins(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        color: FlutterFlowTheme.of(context).primary,
+                                        fontSize: 10,
+                                        letterSpacing: 0.0,
+                                      ),
+                                ),
                               ),
-                              letterSpacing: 0.0,
                             ),
+                        ],
                       ),
                       if (plan.durationMonths != null)
                         Padding(
@@ -441,16 +406,14 @@ class _PlansAsaasWidgetState extends State<PlansAsaasWidget> with TickerProvider
             ),
             if (!isCurrentPlan)
               FFButtonWidget(
-                onPressed: _isPurchasing ? null : () => _purchasePlan(plan),
-                text: _isPurchasing ? 'Processando...' : 'Escolher Plano',
+                onPressed: () => _purchasePlan(plan),
+                text: 'Escolher Plano',
                 options: FFButtonOptions(
                   width: double.infinity,
                   height: 50,
                   padding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 0),
                   iconPadding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 0),
-                  color: _isPurchasing 
-                      ? FlutterFlowTheme.of(context).secondary 
-                      : FlutterFlowTheme.of(context).primary,
+                  color: FlutterFlowTheme.of(context).primary,
                   textStyle: FlutterFlowTheme.of(context).titleSmall.override(
                         font: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600,
@@ -917,7 +880,7 @@ class _PlansAsaasWidgetState extends State<PlansAsaasWidget> with TickerProvider
             },
           ),
           title: Text(
-            'Planos Assas',
+            'Planos',
             style: FlutterFlowTheme.of(context).headlineMedium.override(
                   fontFamily: 'Poppins',
                   letterSpacing: 0.0,
@@ -942,7 +905,7 @@ class _PlansAsaasWidgetState extends State<PlansAsaasWidget> with TickerProvider
                       ),
                   indicatorColor: FlutterFlowTheme.of(context).primary,
                   tabs: [
-                    Tab(text: 'Planos Assas'),
+                    Tab(text: 'Planos'),
                     Tab(text: 'Histórico'),
                   ],
                 )

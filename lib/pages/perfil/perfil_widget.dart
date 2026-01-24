@@ -15,6 +15,7 @@ import '../../services/supabase_service.dart';
 import '../../services/profile_service.dart';
 import '../../utils/logger.dart';
 import '../../services/auth_service.dart';
+import '../../components/upgrade_modal.dart';
 import 'perfil_model.dart';
 export 'perfil_model.dart';
 
@@ -922,6 +923,60 @@ class _PerfilWidgetState extends State<PerfilWidget> {
                                               letterSpacing: 0.0,
                                             ),
                                       ),
+                                      if (_model.isFreePlan)
+                                        Padding(
+                                          padding: EdgeInsetsDirectional.fromSTEB(8.0, 0.0, 0.0, 0.0),
+                                          child: GestureDetector(
+                                            onTap: () {
+                                              UpgradeModal.show(
+                                                context,
+                                                title: 'Upgrade para Planos Pagos',
+                                                message: 'Desbloqueie todo o potencial do app com avaliações ilimitadas e armazenamento sem limites!',
+                                                benefits: [
+                                                  'Avaliações ilimitadas por mês',
+                                                  'Armazenamento ilimitado de fotos',
+                                                  'Sem interrupções no seu fluxo de trabalho',
+                                                  'Acesso a todas as funcionalidades premium',
+                                                ],
+                                              );
+                                            },
+                                            child: Container(
+                                              padding: EdgeInsetsDirectional.fromSTEB(8, 4, 8, 4),
+                                              decoration: BoxDecoration(
+                                                color: FlutterFlowTheme.of(context).primary.withOpacity(0.1),
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(
+                                                  color: FlutterFlowTheme.of(context).primary,
+                                                  width: 1,
+                                                ),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.star_rounded,
+                                                    size: 14,
+                                                    color: FlutterFlowTheme.of(context).primary,
+                                                  ),
+                                                  Padding(
+                                                    padding: EdgeInsetsDirectional.fromSTEB(4, 0, 0, 0),
+                                                    child: Text(
+                                                      'Free',
+                                                      style: FlutterFlowTheme.of(context).bodySmall.override(
+                                                            font: GoogleFonts.poppins(
+                                                              fontWeight: FontWeight.w600,
+                                                            ),
+                                                            color: FlutterFlowTheme.of(context).primary,
+                                                            fontSize: 11,
+                                                            letterSpacing: 0.0,
+                                                          ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                       if (_model.isUpdatingUsername)
                                         Padding(
                                           padding: EdgeInsetsDirectional.fromSTEB(8.0, 0.0, 0.0, 0.0),

@@ -85,6 +85,17 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
     return state.pathParameters['photoId'];
   }
 
+  /// Função helper para navegação segura
+  /// Verifica se é possível fazer pop, se não, redireciona para o feed
+  void _safePop() {
+    if (Navigator.canPop(context)) {
+      context.pop();
+    } else {
+      // Não há histórico de navegação, redirecionar para o feed
+      context.go('/');
+    }
+  }
+
   Future<void> _loadPhotoDetails() async {
     if (_photoId == null || !_servicesInitialized) return;
 
@@ -307,15 +318,22 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        FocusScope.of(context).unfocus();
-        FocusManager.instance.primaryFocus?.unfocus();
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (bool didPop) {
+        if (!didPop) {
+          _safePop();
+        }
       },
-      child: Scaffold(
-        key: scaffoldKey,
-        backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
-        body: SafeArea(
+      child: GestureDetector(
+        onTap: () {
+          FocusScope.of(context).unfocus();
+          FocusManager.instance.primaryFocus?.unfocus();
+        },
+        child: Scaffold(
+          key: scaffoldKey,
+          backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
+          body: SafeArea(
           top: true,
           child: _model.isLoading
               ? Center(
@@ -348,7 +366,7 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
                           Padding(
                             padding: const EdgeInsetsDirectional.fromSTEB(20, 24, 20, 0),
                             child: FFButtonWidget(
-                              onPressed: () => context.pop(),
+                              onPressed: _safePop,
                               text: 'Voltar',
                               options: FFButtonOptions(
                                 height: 40,
@@ -404,6 +422,7 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
                     ),
         ),
       ),
+      ),
     );
   }
 
@@ -423,7 +442,7 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
+            onPressed: _safePop,
             color: FlutterFlowTheme.of(context).primaryText,
           ),
           // Avatar do usuário

@@ -20,6 +20,9 @@ import '../../models/photo_model.dart';
 import '../../models/achievement_model.dart';
 import '../../components/achievement_unlocked_modal.dart';
 import '../../components/interstitial_ad_manager.dart';
+import '../../services/upgrade_prompt_service.dart';
+import '../../components/upgrade_modal.dart';
+import '../../components/upgrade_banner.dart';
 import 'package:go_router/go_router.dart';
 import 'avalia_model.dart';
 export 'avalia_model.dart';
@@ -42,9 +45,11 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
   late AIEvaluationService _aiService;
   late PlanService _planService;
   late AchievementService _achievementService;
+  UpgradePromptService? _upgradePromptService;
   AdService? _adService;
   InterstitialAdManager? _interstitialAdManager;
   bool _servicesInitialized = false;
+  bool _showUpgradeCard = false;
 
   @override
   void initState() {
@@ -62,6 +67,7 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
       _aiService = AIEvaluationService(supabaseService);
       _planService = PlanService(supabaseService);
       _achievementService = AchievementService(supabaseService);
+      _upgradePromptService = UpgradePromptService(_planService, supabaseService);
       _adService = AdService(supabaseService);
       
       // Criar InterstitialAdManager e pré-carregar anúncio
@@ -73,6 +79,25 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
         _servicesInitialized = true;
       });
       await _checkLimits();
+      
+      // Verificar se deve mostrar modal de limite antes de avaliar
+      final userId = supabaseService.currentUser?.id;
+      if (userId != null && _upgradePromptService != null) {
+        final shouldShow = await _upgradePromptService!.shouldShowLimitWarning(userId, 'evaluations');
+        if (shouldShow && mounted) {
+          await UpgradeModal.show(
+            context,
+            title: 'Você está próximo do limite!',
+            message: 'Você já usou a maior parte das suas avaliações mensais. Upgrade para continuar avaliando sem limites!',
+            benefits: [
+              'Avaliações ilimitadas por mês',
+              'Armazenamento ilimitado',
+              'Sem interrupções no seu fluxo de trabalho',
+            ],
+          );
+          await _upgradePromptService!.trackPromptShown(userId, 'modal_limit_evaluations');
+        }
+      }
     } catch (e, stackTrace) {
       Logger.error('Erro ao inicializar serviços', e, stackTrace);
     }
@@ -205,6 +230,24 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
       
       // Atualizar limites após avaliação (inclui contagem de fotos armazenadas)
       await _checkLimits();
+      
+      // Verificar se deve mostrar card de upgrade após avaliação
+      if (userId != null && _upgradePromptService != null) {
+        final isFree = await _upgradePromptService!.isUserOnFreePlan(userId);
+        if (isFree && mounted) {
+          final progress = await _upgradePromptService!.getUsageProgress(userId);
+          final evaluationsProgress = progress['evaluations'] as Map<String, dynamic>?;
+          
+          if (evaluationsProgress != null) {
+            final used = evaluationsProgress['used'] as int? ?? 0;
+            final limit = evaluationsProgress['limit'] as int? ?? 0;
+            
+            setState(() {
+              _showUpgradeCard = true;
+            });
+          }
+        }
+      }
       
       // Mostrar intersticial após avaliação completa (para usuários free)
       await _interstitialAdManager?.showAd();
@@ -1335,8 +1378,36 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
                           ),
                         ),
                       // Resultado da avaliação (mostrar apenas quando não está carregando e há resultado)
-                      if (_model.evaluatedPhoto != null && !_model.isLoading)
+                      if (_model.evaluatedPhoto != null && !_model.isLoading) ...[
                         _buildEvaluationResultCard(),
+                        // Card de upgrade após avaliação para usuários free
+                        if (_showUpgradeCard && _upgradePromptService != null)
+                          FutureBuilder<Map<String, dynamic>>(
+                            future: _upgradePromptService!.getUsageProgress(_planService.currentUserId ?? ''),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData) return SizedBox.shrink();
+                              final progress = snapshot.data!;
+                              final evaluationsProgress = progress['evaluations'] as Map<String, dynamic>?;
+                              
+                              if (evaluationsProgress == null) return SizedBox.shrink();
+                              
+                              final used = evaluationsProgress['used'] as int? ?? 0;
+                              final limit = evaluationsProgress['limit'] as int? ?? 0;
+                              final percentage = (limit > 0 ? used / limit : 0.0) * 100;
+                              
+                              return UpgradeBanner(
+                                title: 'Você já avaliou $used de $limit fotos este mês!',
+                                message: 'Upgrade para planos pagos e tenha avaliações ilimitadas. Continue avaliando sem limites!',
+                                ctaText: 'Ver Planos',
+                                onDismiss: () {
+                                  setState(() {
+                                    _showUpgradeCard = false;
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                      ],
                     ],
                   ),
                 ),

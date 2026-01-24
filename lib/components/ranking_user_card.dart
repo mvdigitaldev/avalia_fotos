@@ -3,6 +3,7 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:go_router/go_router.dart';
 import '../models/ranking_item_model.dart';
 import '../utils/logger.dart';
 
@@ -48,27 +49,31 @@ class RankingUserCard extends StatelessWidget {
       final isTopThree = user.position <= 3;
       final positionColor = _getPositionColor(context);
 
-      return Container(
-        margin: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 12.0),
-        padding: EdgeInsetsDirectional.fromSTEB(16.0, 16.0, 16.0, 16.0),
-        decoration: BoxDecoration(
-          color: FlutterFlowTheme.of(context).secondaryBackground,
-          borderRadius: BorderRadius.circular(12.0),
-          border: Border.all(
-            color: isTopThree
-                ? positionColor.withOpacity(0.3)
-                : FlutterFlowTheme.of(context).alternate.withOpacity(0.5),
-            width: isTopThree ? 1.5 : 1.0,
-          ),
-          boxShadow: [
-            BoxShadow(
-              blurRadius: 4,
-              color: Colors.black.withOpacity(0.05),
-              offset: const Offset(0, 2),
+      return GestureDetector(
+        onTap: () {
+          context.push('/user-profile/${user.userId}');
+        },
+        child: Container(
+          margin: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 12.0),
+          padding: EdgeInsetsDirectional.fromSTEB(16.0, 16.0, 16.0, 16.0),
+          decoration: BoxDecoration(
+            color: FlutterFlowTheme.of(context).secondaryBackground,
+            borderRadius: BorderRadius.circular(12.0),
+            border: Border.all(
+              color: isTopThree
+                  ? positionColor.withOpacity(0.3)
+                  : FlutterFlowTheme.of(context).alternate.withOpacity(0.5),
+              width: isTopThree ? 1.5 : 1.0,
             ),
-          ],
-        ),
-        child: Row(
+            boxShadow: [
+              BoxShadow(
+                blurRadius: 4,
+                color: Colors.black.withOpacity(0.05),
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
           mainAxisSize: MainAxisSize.max,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -199,6 +204,7 @@ class RankingUserCard extends StatelessWidget {
               ),
             ),
           ],
+          ),
         ),
       );
     } catch (e, stackTrace) {

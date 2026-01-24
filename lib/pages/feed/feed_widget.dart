@@ -3,6 +3,8 @@ import '/components/share_bottom_sheet.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -30,6 +32,10 @@ import '../../components/banner_ad_widget.dart';
 import '../../components/interstitial_ad_manager.dart';
 import '../../components/photo_trophy_badge.dart';
 import '../../services/photo_of_the_day_service.dart';
+import '../../services/plan_service.dart';
+import '../../services/upgrade_prompt_service.dart';
+import '../../components/upgrade_banner.dart';
+import '../../components/upgrade_post_card.dart';
 import 'feed_model.dart';
 export 'feed_model.dart';
 
@@ -54,10 +60,17 @@ class _FeedWidgetState extends State<FeedWidget> {
   AdService? _adService;
   InterstitialAdManager? _interstitialAdManager;
   PhotoOfTheDayService? _photoOfTheDayService;
+  PlanService? _planService;
+  UpgradePromptService? _upgradePromptService;
   bool _servicesInitialized = false;
   final ScrollController _scrollController = ScrollController();
   String? _currentUsername;
   final Map<String, bool> _photoOfDayCache = {}; // Cache de fotos do dia
+  bool _showUpgradeBanner = false;
+  bool? _isFreeUser;
+  final Set<String> _likesInProgress = {}; // Proteção contra cliques duplos
+  final Map<String, DateTime> _heartAnimations = {}; // Controla animações de coração por foto (timestamp de início)
+  Timer? _animationTimer; // Timer para atualizar animações
   
   // Cache manager customizado para fotos
   static final CacheManager _photoCacheManager = CacheManager(
@@ -92,6 +105,8 @@ class _FeedWidgetState extends State<FeedWidget> {
       _blockService = BlockService(supabaseService);
       _adService = AdService(supabaseService);
       _photoOfTheDayService = PhotoOfTheDayService(supabaseService);
+      _planService = PlanService(supabaseService);
+      _upgradePromptService = UpgradePromptService(_planService!, supabaseService);
       
       // Configurar BlockService no PhotoService para filtrar usuários bloqueados
       _photoService.setBlockService(_blockService!);
@@ -107,6 +122,22 @@ class _FeedWidgetState extends State<FeedWidget> {
         setState(() {
           _currentUsername = userProfile.username;
         });
+      }
+      
+      // Verificar se deve mostrar banner de upgrade
+      final userId = supabaseService.currentUser?.id;
+      if (userId != null && _upgradePromptService != null) {
+        final isFree = await _upgradePromptService!.isUserOnFreePlan(userId);
+        setState(() {
+          _isFreeUser = isFree;
+        });
+        
+        if (isFree) {
+          final shouldShow = await _upgradePromptService!.shouldShowBanner(userId, 'feed');
+          setState(() {
+            _showUpgradeBanner = shouldShow;
+          });
+        }
       }
       
       setState(() {
@@ -185,28 +216,157 @@ class _FeedWidgetState extends State<FeedWidget> {
   }
 
   Future<void> _toggleLike(PhotoModel photo) async {
+    // Proteção contra cliques duplos
+    if (_likesInProgress.contains(photo.id)) {
+      return;
+    }
+
+    // Salvar estado anterior para rollback em caso de erro
+    final previousState = photo.copyWith();
+    final wasLiked = photo.isLiked ?? false;
+    final previousLikesCount = photo.likesCount;
+
+    // Marcar como em progresso
+    _likesInProgress.add(photo.id);
+
+    // Atualizar UI imediatamente (optimistic update)
+    safeSetState(() {
+      final index = _model.photos.indexWhere((p) => p.id == photo.id);
+      if (index != -1) {
+        _model.photos[index] = photo.copyWith(
+          isLiked: !wasLiked,
+          likesCount: wasLiked
+              ? (previousLikesCount > 0 ? previousLikesCount - 1 : 0)
+              : previousLikesCount + 1,
+        );
+      }
+    });
+
+    // Fazer chamada ao banco em background
     try {
       await _photoService.toggleLike(photo.id);
+      // Sucesso - UI já está atualizada
+    } catch (e) {
+      // Reverter em caso de erro
       safeSetState(() {
         final index = _model.photos.indexWhere((p) => p.id == photo.id);
         if (index != -1) {
-          final updatedPhoto = photo.copyWith(
-            isLiked: !(photo.isLiked ?? false),
-            likesCount: photo.isLiked == true
-                ? photo.likesCount - 1
-                : photo.likesCount + 1,
-          );
-          _model.photos[index] = updatedPhoto;
+          _model.photos[index] = previousState;
         }
       });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao curtir foto: $e'),
-          backgroundColor: FlutterFlowTheme.of(context).error,
-        ),
-      );
+
+      // Mostrar erro ao usuário
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao curtir foto: $e'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+      }
+    } finally {
+      // Remover da lista de em progresso
+      _likesInProgress.remove(photo.id);
     }
+  }
+
+  /// Handler para double tap que dá like e mostra animação
+  void _handleDoubleTapLike(PhotoModel photo) {
+    // Disparar animação com timestamp
+    safeSetState(() {
+      _heartAnimations[photo.id] = DateTime.now();
+    });
+
+    // Chamar toggle like (já otimizado)
+    _toggleLike(photo);
+
+    // Iniciar timer para atualizar animação (se não estiver rodando)
+    _startAnimationTimer();
+
+    // Remover animação após duração total (300ms fade in + 900ms visível + 300ms fade out)
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        safeSetState(() {
+          _heartAnimations.remove(photo.id);
+        });
+        // Parar timer se não houver mais animações
+        if (_heartAnimations.isEmpty) {
+          _stopAnimationTimer();
+        }
+      }
+    });
+  }
+
+  /// Inicia timer para atualizar animações
+  void _startAnimationTimer() {
+    if (_animationTimer != null && _animationTimer!.isActive) {
+      return; // Timer já está rodando
+    }
+
+    _animationTimer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
+      if (!mounted || _heartAnimations.isEmpty) {
+        _stopAnimationTimer();
+        return;
+      }
+
+      // Forçar rebuild para atualizar animações
+      safeSetState(() {
+        // Apenas força rebuild, os cálculos são feitos no _buildHeartAnimation
+      });
+    });
+  }
+
+  /// Para timer de animações
+  void _stopAnimationTimer() {
+    _animationTimer?.cancel();
+    _animationTimer = null;
+  }
+
+  /// Widget de animação de coração
+  Widget _buildHeartAnimation(String photoId) {
+    final animationStart = _heartAnimations[photoId];
+    if (animationStart == null) return const SizedBox.shrink();
+
+    final now = DateTime.now();
+    final elapsed = now.difference(animationStart).inMilliseconds;
+    const totalDuration = 1500; // Duração total da animação
+    
+    if (elapsed >= totalDuration) {
+      // Animação terminou, será removida no próximo build
+      return const SizedBox.shrink();
+    }
+
+    double opacity;
+    double scale;
+
+    if (elapsed < 300) {
+      // Fade in (0-300ms) com curva elástica
+      final progress = elapsed / 300;
+      opacity = progress;
+      // Usar curva elástica para scale
+      scale = progress < 1.0 ? (1.0 - math.pow(1.0 - progress, 3).toDouble()) * 1.2 : 1.0; // Overshoot para efeito elástico
+    } else if (elapsed < 1200) {
+      // Visível (300-1200ms)
+      opacity = 1.0;
+      scale = 1.0;
+    } else {
+      // Fade out (1200-1500ms)
+      final fadeOutProgress = (elapsed - 1200) / 300;
+      opacity = 1.0 - fadeOutProgress;
+      scale = 1.0 - (fadeOutProgress * 0.2); // Leve redução de scale no fade out
+    }
+
+    return Opacity(
+      opacity: opacity.clamp(0.0, 1.0),
+      child: Transform.scale(
+        scale: scale.clamp(0.0, 1.5),
+        child: Icon(
+          Icons.favorite,
+          size: 120,
+          color: FlutterFlowTheme.of(context).error,
+        ),
+      ),
+    );
   }
 
   Future<void> _showOptionsBottomSheet(PhotoModel photo) async {
@@ -574,6 +734,12 @@ class _FeedWidgetState extends State<FeedWidget> {
             return const SizedBox.shrink();
           },
         ),
+        // Animação de coração para double tap
+        Positioned.fill(
+          child: Center(
+            child: _buildHeartAnimation(photo.id),
+          ),
+        ),
       ],
     );
   }
@@ -600,6 +766,31 @@ class _FeedWidgetState extends State<FeedWidget> {
     }
   }
 
+  List<Widget> _buildFeedItems() {
+    final items = <Widget>[];
+    final isFree = _isFreeUser ?? false;
+    
+    for (int i = 0; i < _model.photos.length; i++) {
+      // Adicionar foto
+      items.add(_buildPhotoCard(_model.photos[i]));
+      
+      // A cada 5 fotos (índices 4, 9, 14, 19, etc.), adicionar banner
+      // Ciclar Banner 1, 2, 3: 1–5→1, 6–10→2, 11–15→3, 16–20→1, ...
+      if (isFree && (i + 1) % 5 == 0 && i < _model.photos.length - 1) {
+        final block = (i + 1) ~/ 5;
+        final variant = ((block - 1) % 3) + 1;
+        items.add(UpgradePostCard(
+          variant: variant,
+          onUpgrade: () {
+            context.push('/plans_assas');
+          },
+        ));
+      }
+    }
+    
+    return items;
+  }
+
   Widget _buildPhotoCard(PhotoModel photo) {
     return Container(
       width: double.infinity,
@@ -623,15 +814,22 @@ class _FeedWidgetState extends State<FeedWidget> {
                         color: FlutterFlowTheme.of(context).primaryText,
                         size: 24.0,
                       ),
-                Padding(
-                  padding: EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 0.0, 0.0),
-                  child: Text(
-                    photo.username ?? 'Usuário',
-                    style: FlutterFlowTheme.of(context).titleSmall.override(
-                          font: GoogleFonts.poppins(),
-                          fontSize: 14.0,
-                          letterSpacing: 0.0,
-                        ),
+                GestureDetector(
+                  onTap: () {
+                    if (photo.userId != null) {
+                      context.push('/user-profile/${photo.userId}');
+                    }
+                  },
+                  child: Padding(
+                    padding: EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 0.0, 0.0),
+                    child: Text(
+                      photo.username ?? 'Usuário',
+                      style: FlutterFlowTheme.of(context).titleSmall.override(
+                            font: GoogleFonts.poppins(),
+                            fontSize: 14.0,
+                            letterSpacing: 0.0,
+                          ),
+                    ),
                   ),
                 ),
                 Padding(
@@ -665,6 +863,9 @@ class _FeedWidgetState extends State<FeedWidget> {
           GestureDetector(
             onTap: () {
               context.push('/photo-detail/${photo.id}');
+            },
+            onDoubleTap: () {
+              _handleDoubleTapLike(photo);
             },
             child: _buildImageWidget(photo),
           ),
@@ -805,6 +1006,7 @@ class _FeedWidgetState extends State<FeedWidget> {
 
   @override
   void dispose() {
+    _stopAnimationTimer();
     _scrollController.dispose();
     _model.dispose();
     _interstitialAdManager?.dispose();
@@ -1020,6 +1222,24 @@ class _FeedWidgetState extends State<FeedWidget> {
                                   ],
                                 ),
                               ),
+                              // Banner de upgrade para usuários free
+                              if (_showUpgradeBanner && _servicesInitialized)
+                                Padding(
+                                  padding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 24),
+                                  child: UpgradeBanner(
+                                    title: 'Desbloqueie todo o potencial!',
+                                    message: 'Upgrade para planos pagos e tenha avaliações ilimitadas e armazenamento sem limites.',
+                                    onDismiss: () async {
+                                      final userId = _authService.currentUser?.id;
+                                      if (userId != null && _upgradePromptService != null) {
+                                        await _upgradePromptService!.trackPromptShown(userId, 'banner_feed');
+                                        setState(() {
+                                          _showUpgradeBanner = false;
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
                               // Indicador de carregamento inicial
                               if (_model.photos.isEmpty && _model.isLoading)
                                 Padding(
@@ -1047,10 +1267,8 @@ class _FeedWidgetState extends State<FeedWidget> {
                                         ),
                                   ),
                                 ),
-                              // Lista de fotos
-                              ..._model.photos.map((photo) {
-                                return _buildPhotoCard(photo);
-                              }),
+                              // Lista de fotos com banners intercalados
+                              ..._buildFeedItems(),
                               // Indicador de carregamento ao rolar para baixo
                               if (_model.isLoading && _model.photos.isNotEmpty)
                                 Padding(

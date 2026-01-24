@@ -204,25 +204,43 @@ class PhotoService {
         throw Exception('Usuário não autenticado');
       }
 
-      // Verificar se já curtiu
-      final existingLike = await _client
-          .from('likes')
-          .select('id')
-          .eq('photo_id', photoId)
-          .eq('user_id', currentUserId!)
-          .maybeSingle();
+      // Tentar usar função RPC otimizada primeiro
+      try {
+        final result = await _client.rpc(
+          'toggle_photo_like',
+          params: {
+            'p_photo_id': photoId,
+            'p_user_id': currentUserId!,
+          },
+        );
+        
+        // Função RPC retorna JSON com resultado
+        // Não precisamos fazer nada aqui, a UI já foi atualizada otimisticamente
+        Logger.debug('Like toggled via RPC: $result');
+      } catch (rpcError) {
+        // Se a função RPC não existir ainda, usar método antigo como fallback
+        Logger.warning('RPC toggle_photo_like não disponível, usando método antigo: $rpcError');
+        
+        // Verificar se já curtiu
+        final existingLike = await _client
+            .from('likes')
+            .select('id')
+            .eq('photo_id', photoId)
+            .eq('user_id', currentUserId!)
+            .maybeSingle();
 
-      if (existingLike != null) {
-        // Remover like
-        await _client.from('likes').delete().eq('id', existingLike['id']);
-        await _client.rpc('decrement_likes_count', params: {'p_photo_id': photoId});
-      } else {
-        // Adicionar like
-        await _client.from('likes').insert({
-          'photo_id': photoId,
-          'user_id': currentUserId!,
-        });
-        await _client.rpc('increment_likes_count', params: {'p_photo_id': photoId});
+        if (existingLike != null) {
+          // Remover like
+          await _client.from('likes').delete().eq('id', existingLike['id']);
+          await _client.rpc('decrement_likes_count', params: {'p_photo_id': photoId});
+        } else {
+          // Adicionar like
+          await _client.from('likes').insert({
+            'photo_id': photoId,
+            'user_id': currentUserId!,
+          });
+          await _client.rpc('increment_likes_count', params: {'p_photo_id': photoId});
+        }
       }
     } catch (e) {
       throw _handleError(e);
@@ -298,15 +316,16 @@ class PhotoService {
     }
   }
 
-  Future<int> getUserPhotosCount({bool? isShared}) async {
+  Future<int> getUserPhotosCount({String? userId, bool? isShared}) async {
     try {
-      if (currentUserId == null) return 0;
+      final targetUserId = userId ?? currentUserId;
+      if (targetUserId == null) return 0;
 
       // Buscar todas as fotos sem limit para contar
       var query = _client
           .from('photos')
           .select('id')
-          .eq('user_id', currentUserId!);
+          .eq('user_id', targetUserId);
 
       if (isShared != null) {
         query = query.eq('is_shared', isShared);
@@ -317,6 +336,25 @@ class PhotoService {
     } catch (e) {
       throw _handleError(e);
     }
+  }
+
+  /// Busca fotos compartilhadas de um usuário específico (para perfil público)
+  Future<List<PhotoModel>> getUserSharedPhotos({
+    required String userId,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    return getUserPhotos(
+      userId: userId,
+      limit: limit,
+      offset: offset,
+      isShared: true, // Apenas fotos compartilhadas
+    );
+  }
+
+  /// Conta total de fotos compartilhadas de um usuário
+  Future<int> getUserSharedPhotosCount(String userId) async {
+    return getUserPhotosCount(userId: userId, isShared: true);
   }
 
   Future<int> getUserStorageCount() async {

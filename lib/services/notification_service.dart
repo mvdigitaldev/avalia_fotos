@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -417,12 +418,15 @@ class NotificationService {
       iOS: iosDetails,
     );
 
+    // Converter dados da mensagem para JSON string para usar como payload
+    final payload = jsonEncode(message.data);
+
     await _localNotifications.show(
       message.hashCode,
       notification.title,
       notification.body,
       details,
-      payload: message.data.toString(),
+      payload: payload,
     );
   }
 
@@ -433,12 +437,38 @@ class NotificationService {
     // Tentar parsear payload como dados JSON
     try {
       if (response.payload != null && response.payload!.isNotEmpty) {
-        // O payload pode conter dados da notificação
-        // Processar através do handler de mensagens se possível
+        // Tentar parsear como JSON
+        try {
+          final payloadData = jsonDecode(response.payload!);
+          if (payloadData is Map<String, dynamic>) {
+            Logger.debug('Payload parseado: $payloadData');
+            // Processar deep link do payload
+            _processNotificationDeepLink(payloadData);
+            return;
+          }
+        } catch (jsonError) {
+          Logger.debug('Payload não é JSON válido, tentando como string: $jsonError');
+        }
+        
+        // Se não for JSON, tentar extrair dados do formato string
+        // O payload pode estar no formato: "{type: upgrade_plan, deep_link: /plans_assas}"
         Logger.debug('Payload da notificação: ${response.payload}');
       }
+      
+      // Fallback: se não conseguir processar o payload, usar rota padrão para upgrade_plan
+      // Isso acontece quando a notificação é tocada mas os dados não estão no payload
+      Logger.info('Processando deep link padrão para upgrade_plan');
+      _processNotificationDeepLink({
+        'type': 'upgrade_plan',
+        'deep_link': '/plans_assas'
+      });
     } catch (e) {
-      Logger.debug('Erro ao processar payload da notificação: $e');
+      Logger.error('Erro ao processar payload da notificação: $e');
+      // Em caso de erro, ainda tentar navegar para a página de planos
+      _processNotificationDeepLink({
+        'type': 'upgrade_plan',
+        'deep_link': '/plans_assas'
+      });
     }
   }
 
@@ -480,7 +510,7 @@ class NotificationService {
       } else if (type == 'upgrade_plan') {
         final deepLink = data['deep_link'] as String?;
         
-        String? linkToNavigate = deepLink ?? '/plans';
+        String? linkToNavigate = deepLink ?? '/plans_assas';
         
         if (linkToNavigate != null) {
           Logger.info('Deep link para upgrade de plano: $linkToNavigate');

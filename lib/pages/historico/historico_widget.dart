@@ -16,6 +16,9 @@ import '../../models/photo_model.dart';
 import '../../components/banner_ad_widget.dart';
 import '../../components/photo_trophy_badge.dart';
 import '../../services/photo_of_the_day_service.dart';
+import '../../services/plan_service.dart';
+import '../../services/upgrade_prompt_service.dart';
+import '../../components/upgrade_banner.dart';
 import 'historico_model.dart';
 export 'historico_model.dart';
 
@@ -34,11 +37,14 @@ class _HistoricoWidgetState extends State<HistoricoWidget> {
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
   late PhotoService _photoService;
+  PlanService? _planService;
+  UpgradePromptService? _upgradePromptService;
   AdService? _adService;
   PhotoOfTheDayService? _photoOfTheDayService;
   bool _servicesInitialized = false;
   final Map<String, bool> _photoOfDayCache = {};
   final ScrollController _scrollController = ScrollController();
+  bool _showStorageBanner = false;
 
   // Cache manager customizado para thumbnails
   static final CacheManager _photoCacheManager = CacheManager(
@@ -61,10 +67,26 @@ class _HistoricoWidgetState extends State<HistoricoWidget> {
     try {
       final supabaseService = await SupabaseService.getInstance();
       _photoService = PhotoService(supabaseService);
+      _planService = PlanService(supabaseService);
+      _upgradePromptService = UpgradePromptService(_planService!, supabaseService);
       _adService = AdService(supabaseService);
       _photoOfTheDayService = PhotoOfTheDayService(supabaseService);
       
       // O SDK já é inicializado no main.dart, não precisamos inicializar novamente
+      
+      // Verificar se deve mostrar banner de storage
+      final userId = supabaseService.currentUser?.id;
+      if (userId != null && _upgradePromptService != null) {
+        final isFree = await _upgradePromptService!.isUserOnFreePlan(userId);
+        if (isFree) {
+          final shouldShow = await _upgradePromptService!.shouldShowLimitWarning(userId, 'storage');
+          if (shouldShow) {
+            setState(() {
+              _showStorageBanner = true;
+            });
+          }
+        }
+      }
       
       setState(() {
         _servicesInitialized = true;
@@ -568,6 +590,36 @@ class _HistoricoWidgetState extends State<HistoricoWidget> {
                   ],
                 ),
               ),
+              // Banner de upgrade quando storage está próximo do limite
+              if (_showStorageBanner && _upgradePromptService != null && _model.photos.isNotEmpty)
+                FutureBuilder<Map<String, dynamic>>(
+                  future: _upgradePromptService!.getUsageProgress(_photoService.currentUserId ?? ''),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) return SizedBox.shrink();
+                    final progress = snapshot.data!;
+                    final storageProgress = progress['storage'] as Map<String, dynamic>?;
+                    
+                    if (storageProgress == null) return SizedBox.shrink();
+                    
+                    final used = storageProgress['used'] as int? ?? 0;
+                    final limit = storageProgress['limit'] as int? ?? 0;
+                    
+                    return UpgradeBanner(
+                      title: 'Armazenamento quase cheio!',
+                      message: 'Você está usando $used de $limit fotos. Upgrade para armazenamento ilimitado e continue salvando suas fotos!',
+                      ctaText: 'Ver Planos',
+                      onDismiss: () async {
+                        final userId = _photoService.currentUserId;
+                        if (userId != null && _upgradePromptService != null) {
+                          await _upgradePromptService!.trackPromptShown(userId, 'banner_storage');
+                          setState(() {
+                            _showStorageBanner = false;
+                          });
+                        }
+                      },
+                    );
+                  },
+                ),
               // Grade de fotos
               Expanded(
                 child: _model.photos.isEmpty && _model.isLoading

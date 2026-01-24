@@ -47,6 +47,10 @@ import '/pages/admin/select_photo_of_day_widget.dart';
 import '/pages/admin/send_push_notification_widget.dart';
 // Import ResetPasswordWidget explicitly
 import '/pages/reset_password/reset_password_widget.dart';
+// Import UserProfileWidget explicitly
+import '/pages/user_profile/user_profile_widget.dart';
+// Import CheckoutWebViewWidget explicitly
+import '/pages/checkout_webview/checkout_webview_widget.dart';
 
 export 'package:go_router/go_router.dart';
 export 'serialization_util.dart';
@@ -340,6 +344,12 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) {
         builder: (context, params) => PhotoDetailWidget(),
       ),
       FFRoute(
+        name: UserProfileWidget.routeName,
+        path: UserProfileWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => UserProfileWidget(),
+      ),
+      FFRoute(
         name: PlansWidget.routeName,
         path: PlansWidget.routePath,
         requireAuth: true,
@@ -350,6 +360,18 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) {
         path: PlansAsaasWidget.routePath,
         requireAuth: true,
         builder: (context, params) => PlansAsaasWidget(),
+      ),
+      FFRoute(
+        name: CheckoutWebViewWidget.routeName,
+        path: CheckoutWebViewWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) {
+          final url = params.getParam('url', ParamType.String);
+          if (url == null) {
+            return NavBarPage(); // Fallback se URL não fornecida
+          }
+          return CheckoutWebViewWidget(url: url);
+        },
       ),
       FFRoute(
         name: PerfilWidget.routeName,

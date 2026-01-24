@@ -7,6 +7,8 @@ export '/pages/ranking/ranking_widget.dart' show RankingWidget;
 export '/pages/photo_detail/photo_detail_widget.dart' show PhotoDetailWidget;
 export '/pages/plans/plans_widget.dart' show PlansWidget;
 export '/pages/plans_asaas/plans_asaas_widget.dart' show PlansAsaasWidget;
+export '/pages/checkout_webview/checkout_webview_widget.dart' show CheckoutWebViewWidget;
+export '/pages/user_profile/user_profile_widget.dart' show UserProfileWidget;
 export '/pages/reset_password/reset_password_widget.dart' show ResetPasswordWidget;
 export '/pages/perfil/perfil_widget.dart' show PerfilWidget;
 export '/pages/tutorial_suporte/tutorial_suporte_widget.dart' show TutorialSuporteWidget;

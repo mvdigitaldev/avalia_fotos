@@ -27,6 +27,7 @@ class PaymentService {
             )
           ''')
           .eq('user_id', currentUserId!)
+          .eq('payment_status', 'paid')
           .order('created_at', ascending: false);
 
       return (response as List)

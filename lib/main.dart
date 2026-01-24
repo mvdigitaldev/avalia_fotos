@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
@@ -27,19 +28,79 @@ void main() async {
   // Carregar variáveis de ambiente
   // Na web, o arquivo .env precisa estar nos assets ou usar --dart-define
   // Em mobile, pode carregar do sistema de arquivos
+  Logger.info('=== Carregando variáveis de ambiente ===');
+  
+  // Verificar --dart-define primeiro (não requer arquivo)
+  const assasKeyFromDefine = String.fromEnvironment('ASSAS_KEY', defaultValue: '');
+  if (assasKeyFromDefine.isNotEmpty) {
+    Logger.info('✓ ASSAS_KEY encontrada via --dart-define (${assasKeyFromDefine.length} caracteres)');
+  } else {
+    Logger.info('✗ ASSAS_KEY não encontrada via --dart-define');
+  }
+  
   if (!kIsWeb) {
     try {
+      // Tentar carregar .env da raiz do projeto
+      Logger.info('Tentando carregar arquivo .env...');
       await dotenv.load(fileName: '.env');
-      Logger.info('Variáveis de ambiente carregadas do arquivo .env');
+      Logger.info('✓ Arquivo .env carregado com sucesso');
+      
+      // Listar todas as chaves carregadas
+      final allKeys = dotenv.env.keys.toList();
+      Logger.info('Chaves carregadas do .env: ${allKeys.isEmpty ? "NENHUMA" : allKeys.join(", ")}');
+      
+      // Verificar se ASSAS_KEY foi carregada (para debug)
+      final assasKey = dotenv.env['ASSAS_KEY'];
+      if (assasKey != null && assasKey.isNotEmpty) {
+        final trimmedKey = assasKey.trim();
+        if (trimmedKey.isNotEmpty) {
+          Logger.info('✓ ASSAS_KEY encontrada no arquivo .env (${trimmedKey.length} caracteres)');
+        } else {
+          Logger.error(
+            '✗ ASSAS_KEY no arquivo .env está vazia ou contém apenas espaços!\n'
+            'Verifique o arquivo .env e certifique-se de que a linha está assim:\n'
+            'ASSAS_KEY=sua_chave_aqui\n'
+            '(sem espaços antes ou depois do =)'
+          );
+        }
+      } else {
+        Logger.error(
+          '✗ ASSAS_KEY não encontrada no arquivo .env!\n'
+          'Chaves disponíveis: ${allKeys.isEmpty ? "NENHUMA" : allKeys.join(", ")}\n'
+          'Adicione a linha: ASSAS_KEY=sua_chave_api_do_asaas\n'
+          'Local do arquivo: ${Directory.current.path}/.env'
+        );
+      }
     } catch (e, stackTrace) {
       // Arquivo .env não encontrado - isso é normal se estiver usando --dart-define
-      Logger.debug('Arquivo .env não encontrado ou erro ao carregar', e, stackTrace);
-      Logger.debug('Usando variáveis de ambiente do sistema ou --dart-define ou fallback');
+      final errorMsg = e.toString();
+      Logger.warning('Erro ao carregar arquivo .env: $e');
+      
+      if (errorMsg.contains('FileSystemException') || errorMsg.contains('not found')) {
+        Logger.warning('Arquivo .env não encontrado. Local esperado: ${Directory.current.path}/.env');
+      }
+      
+      // Se --dart-define também não tiver a chave, mostrar erro
+      if (assasKeyFromDefine.isEmpty) {
+        Logger.error(
+          '✗ ASSAS_KEY não encontrada em nenhuma fonte!\n'
+          'Configure usando uma das opções:\n'
+          '  1. Criar arquivo .env na raiz do projeto com: ASSAS_KEY=sua_chave_aqui\n'
+          '  2. Executar com: flutter clean && flutter run --dart-define=ASSAS_KEY=sua_chave_aqui\n'
+          '     (IMPORTANTE: --dart-define requer rebuild completo do app)'
+        );
+      }
     }
   } else {
     // Na web, tentar carregar do assets (se configurado) ou usar --dart-define
     Logger.debug('Plataforma web detectada - usando --dart-define ou fallback para variáveis de ambiente');
+    
+    if (assasKeyFromDefine.isEmpty) {
+      Logger.warning('ASSAS_KEY não encontrada via --dart-define na web');
+    }
   }
+  
+  Logger.info('=== Fim do carregamento de variáveis de ambiente ===');
 
   await FlutterFlowTheme.initialize();
 
