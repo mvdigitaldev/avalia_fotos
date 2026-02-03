@@ -216,25 +216,28 @@ class _RankingWidgetState extends State<RankingWidget>
         physics: const AlwaysScrollableScrollPhysics(),
         child: Padding(
           padding: EdgeInsetsDirectional.fromSTEB(20.0, 40.0, 20.0, 40.0),
-          child: Column(
-            children: [
-              Icon(
-                Icons.people_outline,
-                size: 64,
-                color: FlutterFlowTheme.of(context).secondary,
-              ),
-              Padding(
-                padding: EdgeInsetsDirectional.fromSTEB(0.0, 16.0, 0.0, 0.0),
-                child: Text(
-                  'Nenhum usuário encontrado',
-                  style: FlutterFlowTheme.of(context).bodyMedium.override(
-                        font: GoogleFonts.poppins(),
-                        color: FlutterFlowTheme.of(context).secondary,
-                        letterSpacing: 0.0,
-                      ),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.people_outline,
+                  size: 64,
+                  color: FlutterFlowTheme.of(context).secondary,
                 ),
-              ),
-            ],
+                Padding(
+                  padding: EdgeInsetsDirectional.fromSTEB(0.0, 16.0, 0.0, 0.0),
+                  child: Text(
+                    'Nenhum usuário encontrado',
+                    style: FlutterFlowTheme.of(context).bodyMedium.override(
+                          font: GoogleFonts.poppins(),
+                          color: FlutterFlowTheme.of(context).secondary,
+                          letterSpacing: 0.0,
+                        ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -449,29 +452,32 @@ class _RankingWidgetState extends State<RankingWidget>
                                 Padding(
                                   padding: EdgeInsetsDirectional.fromSTEB(
                                       0.0, 40.0, 0.0, 40.0),
-                                  child: Column(
-                                    children: [
-                                      Icon(
-                                        Icons.photo_outlined,
-                                        size: 64,
-                                        color: FlutterFlowTheme.of(context).secondary,
-                                      ),
-                                      Padding(
-                                        padding: EdgeInsetsDirectional.fromSTEB(
-                                            0.0, 16.0, 0.0, 0.0),
-                                        child: Text(
-                                          'Nenhuma foto encontrada',
-                                          style: FlutterFlowTheme.of(context)
-                                              .bodyMedium
-                                              .override(
-                                                font: GoogleFonts.poppins(),
-                                                color: FlutterFlowTheme.of(context)
-                                                    .secondary,
-                                                letterSpacing: 0.0,
-                                              ),
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.photo_outlined,
+                                          size: 64,
+                                          color: FlutterFlowTheme.of(context).secondary,
                                         ),
-                                      ),
-                                    ],
+                                        Padding(
+                                          padding: EdgeInsetsDirectional.fromSTEB(
+                                              0.0, 16.0, 0.0, 0.0),
+                                          child: Text(
+                                            'Nenhuma foto encontrada',
+                                            style: FlutterFlowTheme.of(context)
+                                                .bodyMedium
+                                                .override(
+                                                  font: GoogleFonts.poppins(),
+                                                  color: FlutterFlowTheme.of(context)
+                                                      .secondary,
+                                                  letterSpacing: 0.0,
+                                                ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 )
                               else
