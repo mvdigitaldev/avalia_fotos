@@ -31,6 +31,7 @@ import '../../utils/logger.dart';
 import '../../components/banner_ad_widget.dart';
 import '../../components/interstitial_ad_manager.dart';
 import '../../components/photo_trophy_badge.dart';
+import '../../components/verified_badge.dart';
 import '../../services/photo_of_the_day_service.dart';
 import '../../services/plan_service.dart';
 import '../../services/upgrade_prompt_service.dart';
@@ -822,13 +823,24 @@ class _FeedWidgetState extends State<FeedWidget> {
                   },
                   child: Padding(
                     padding: EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 0.0, 0.0),
-                    child: Text(
-                      photo.username ?? 'Usuário',
-                      style: FlutterFlowTheme.of(context).titleSmall.override(
-                            font: GoogleFonts.poppins(),
-                            fontSize: 14.0,
-                            letterSpacing: 0.0,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          photo.username ?? 'Usuário',
+                          style: FlutterFlowTheme.of(context).titleSmall.override(
+                                font: GoogleFonts.poppins(),
+                                fontSize: 14.0,
+                                letterSpacing: 0.0,
+                              ),
+                        ),
+                        if (photo.hasPaidPlan == true) ...[
+                          Padding(
+                            padding: EdgeInsetsDirectional.fromSTEB(6.0, 0.0, 0.0, 0.0),
+                            child: VerifiedBadge(size: VerifiedBadgeSize.small),
                           ),
+                        ],
+                      ],
                     ),
                   ),
                 ),
@@ -1228,7 +1240,7 @@ class _FeedWidgetState extends State<FeedWidget> {
                                   padding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 24),
                                   child: UpgradeBanner(
                                     title: 'Desbloqueie todo o potencial!',
-                                    message: 'Upgrade para planos pagos e tenha avaliações ilimitadas e armazenamento sem limites.',
+                                    message: 'Assine um dos planos pagos e tenha + avaliações e + armazenamento! Desfrute do app sem anúncios.',
                                     onDismiss: () async {
                                       final userId = _authService.currentUser?.id;
                                       if (userId != null && _upgradePromptService != null) {

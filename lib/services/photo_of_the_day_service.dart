@@ -163,93 +163,24 @@ class PhotoOfTheDayService {
   /// Busca fotos candidatas para uma data (fotos compartilhadas de usuários com plano pago)
   Future<List<PhotoModel>> getCandidatePhotos(DateTime date) async {
     try {
-      // Buscar fotos publicadas na data selecionada
-      final startOfDay = DateTime(date.year, date.month, date.day);
-      final endOfDay = startOfDay.add(const Duration(days: 1));
+      final dateStr = _formatDate(date);
+      final response = await _client.rpc(
+        'get_candidate_photos_for_day',
+        params: {'p_date': dateStr},
+      );
 
-      final response = await _client
-          .from('photos')
-          .select('''
-            *,
-            users:user_id (
-              username,
-              avatar_url
-            )
-          ''')
-          .eq('is_shared', true)
-          .gte('created_at', startOfDay.toIso8601String())
-          .lt('created_at', endOfDay.toIso8601String())
-          .order('score', ascending: false);
+      if (response == null || response is! List) return [];
 
       final photos = <PhotoModel>[];
-
       for (final item in response) {
-        final photo = PhotoModel.fromJson(item);
-        
-        // Verificar se o usuário tem plano pago ativo
-        final hasPaidPlan = await _checkUserHasPaidPlan(photo.userId);
-        if (hasPaidPlan) {
-          photos.add(photo);
+        if (item is Map<String, dynamic>) {
+          photos.add(PhotoModel.fromJson(item));
         }
       }
-
       return photos;
     } catch (e, stackTrace) {
       Logger.error('Erro ao buscar fotos candidatas', e, stackTrace);
       return [];
-    }
-  }
-
-  /// Verifica se um usuário tem plano pago ativo
-  Future<bool> _checkUserHasPaidPlan(String userId) async {
-    try {
-      final response = await _client
-          .from('user_plans')
-          .select('''
-            *,
-            plans:plan_id (
-              price
-            )
-          ''')
-          .eq('user_id', userId)
-          .eq('is_active', true)
-          .order('started_at', ascending: false)
-          .limit(1)
-          .maybeSingle();
-
-      if (response == null) return false;
-
-      // Verificar se o plano não expirou
-      final expiresAt = response['expires_at'] as String?;
-      if (expiresAt != null) {
-        final expiryDate = DateTime.parse(expiresAt);
-        if (expiryDate.isBefore(DateTime.now())) {
-          return false;
-        }
-      }
-
-      final planData = response['plans'];
-      if (planData == null) return false;
-
-      // Se planData é uma lista, pegar o primeiro item
-      Map<String, dynamic> plan;
-      if (planData is List && planData.isNotEmpty) {
-        plan = planData.first as Map<String, dynamic>;
-      } else if (planData is Map) {
-        plan = planData as Map<String, dynamic>;
-      } else {
-        return false;
-      }
-
-      final price = plan['price'];
-      if (price == null) return false;
-
-      // Converter para num e verificar se é maior que 0
-      final priceNum = price is String ? double.tryParse(price) : (price as num?)?.toDouble();
-      return priceNum != null && priceNum > 0;
-    } catch (e) {
-      Logger.debug('Erro ao verificar plano pago: $e');
-      return false;
     }
   }
 

@@ -157,6 +157,29 @@ class PlanService {
     }
   }
 
+  /// Retorna mapa de userId -> hasPaidPlan para uma lista de usuários
+  Future<Map<String, bool>> getUsersPaidPlanStatus(List<String> userIds) async {
+    if (userIds.isEmpty) return {};
+    try {
+      final response = await _client.rpc(
+        'get_users_paid_plan_status',
+        params: {'p_user_ids': userIds},
+      );
+      if (response == null || response is! List) return {};
+      final result = <String, bool>{};
+      for (final item in response) {
+        if (item is Map<String, dynamic>) {
+          final uid = item['user_id'] as String?;
+          final hasPaid = item['has_paid_plan'] as bool? ?? false;
+          if (uid != null) result[uid] = hasPaid;
+        }
+      }
+      return result;
+    } catch (e) {
+      return {};
+    }
+  }
+
   /// Verifica se o usuário está no plano free
   Future<bool> isUserOnFreePlan(String userId) async {
     try {

@@ -49,6 +49,32 @@ class RankingService {
           .range(offset, offset + limit - 1);
 
       Logger.debug('Resposta recebida: ${response.length} itens');
+
+      // Buscar status de plano pago dos usuários
+      final userIds = (response as List)
+          .map((item) => item['user_id'] as String?)
+          .whereType<String>()
+          .toList();
+      Map<String, bool> paidPlanStatus = {};
+      if (userIds.isNotEmpty) {
+        try {
+          final paidResponse = await _client.rpc(
+            'get_users_paid_plan_status',
+            params: {'p_user_ids': userIds},
+          );
+          if (paidResponse != null && paidResponse is List) {
+            for (final item in paidResponse) {
+              if (item is Map<String, dynamic>) {
+                final uid = item['user_id'] as String?;
+                final hasPaid = item['has_paid_plan'] as bool? ?? false;
+                if (uid != null) paidPlanStatus[uid] = hasPaid;
+              }
+            }
+          }
+        } catch (e) {
+          Logger.debug('Erro ao buscar status de plano pago no ranking: $e');
+        }
+      }
       
       final users = <RankingItemModel>[];
       for (var i = 0; i < response.length; i++) {
@@ -86,6 +112,7 @@ class RankingService {
           }
           
           final userId = item['user_id'] as String;
+          final hasPaidPlan = paidPlanStatus[userId] ?? false;
           
           users.add(RankingItemModel(
             userId: userId,
@@ -94,6 +121,7 @@ class RankingService {
             score: scoreValue,
             photosCount: photosCountValue,
             position: offset + i + 1,
+            hasPaidPlan: hasPaidPlan,
           ));
         } catch (e, stackTrace) {
           Logger.warning('Erro ao processar item $i do ranking', e, stackTrace);

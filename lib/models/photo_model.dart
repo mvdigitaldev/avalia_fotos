@@ -17,6 +17,7 @@ class PhotoModel {
   final String? username;
   final String? userAvatarUrl;
   final bool? isLiked;
+  final bool? hasPaidPlan;
 
   PhotoModel({
     required this.id,
@@ -37,6 +38,7 @@ class PhotoModel {
     this.username,
     this.userAvatarUrl,
     this.isLiked,
+    this.hasPaidPlan,
   });
 
   factory PhotoModel.fromJson(Map<String, dynamic> json) {
@@ -77,6 +79,7 @@ class PhotoModel {
       username: userData?['username'] as String? ?? json['username'] as String?,
       userAvatarUrl: userData?['avatar_url'] as String? ?? json['user_avatar_url'] as String?,
       isLiked: json['is_liked'] as bool?,
+      hasPaidPlan: json['has_paid_plan'] as bool?,
     );
   }
 
@@ -119,6 +122,7 @@ class PhotoModel {
     String? username,
     String? userAvatarUrl,
     bool? isLiked,
+    bool? hasPaidPlan,
   }) {
     return PhotoModel(
       id: id ?? this.id,
@@ -139,6 +143,7 @@ class PhotoModel {
       username: username ?? this.username,
       userAvatarUrl: userAvatarUrl ?? this.userAvatarUrl,
       isLiked: isLiked ?? this.isLiked,
+      hasPaidPlan: hasPaidPlan ?? this.hasPaidPlan,
     );
   }
 }

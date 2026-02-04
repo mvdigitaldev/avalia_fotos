@@ -75,6 +75,33 @@ class PhotoService {
         }
       }
 
+      // Buscar status de plano pago dos autores das fotos
+      final feedUserIds = (response as List)
+          .map((item) => item['user_id'] as String?)
+          .whereType<String>()
+          .toSet()
+          .toList();
+      Map<String, bool> paidPlanStatus = {};
+      if (feedUserIds.isNotEmpty) {
+        try {
+          final paidResponse = await _client.rpc(
+            'get_users_paid_plan_status',
+            params: {'p_user_ids': feedUserIds},
+          );
+          if (paidResponse != null && paidResponse is List) {
+            for (final item in paidResponse) {
+              if (item is Map<String, dynamic>) {
+                final uid = item['user_id'] as String?;
+                final hasPaid = item['has_paid_plan'] as bool? ?? false;
+                if (uid != null) paidPlanStatus[uid] = hasPaid;
+              }
+            }
+          }
+        } catch (e) {
+          Logger.debug('Erro ao buscar status de plano pago: $e');
+        }
+      }
+
       // Buscar todos os likes do usuário atual em uma única query (otimização N+1)
       Set<String> likedPhotoIds = {};
       if (currentUserId != null && photoIds.isNotEmpty) {
@@ -107,11 +134,13 @@ class PhotoService {
           
           // Verificar se o usuário curtiu usando o Set pré-carregado
           final isLiked = currentUserId != null && likedPhotoIds.contains(photo.id);
+          final hasPaidPlan = paidPlanStatus[photo.userId] ?? false;
 
           photos.add(photo.copyWith(
             username: userData?['username'] as String?,
             userAvatarUrl: userData?['avatar_url'] as String?,
             isLiked: isLiked,
+            hasPaidPlan: hasPaidPlan,
           ));
         } catch (e, stackTrace) {
           Logger.warning('Erro ao processar foto', e, stackTrace);
@@ -548,13 +577,89 @@ class PhotoService {
     }
   }
 
+  /// Fotos por categoria (score > 9, ordenadas por data, paginadas)
+  Future<List<PhotoModel>> getPhotosByCategory({
+    required String categoria,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    try {
+      Set<String> blockedUserIds = {};
+      if (_blockService != null && currentUserId != null) {
+        try {
+          blockedUserIds = await _blockService!.getBlockedUserIds();
+        } catch (e) {
+          Logger.warning('Erro ao obter usuários bloqueados, continuando sem filtro', e);
+        }
+      }
+
+      final response = await _client
+          .from('photos')
+          .select('''
+            *,
+            users:user_id (
+              username,
+              avatar_url
+            )
+          ''')
+          .eq('is_shared', true)
+          .eq('categoria', categoria)
+          .gt('score', 9)
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      final photoIds = <String>[];
+      for (final item in response) {
+        final photoId = item['id'] as String?;
+        if (photoId != null) photoIds.add(photoId);
+      }
+
+      Set<String> likedPhotoIds = {};
+      if (currentUserId != null && photoIds.isNotEmpty) {
+        try {
+          final likesResponse = await _client
+              .from('likes')
+              .select('photo_id')
+              .eq('user_id', currentUserId!)
+              .inFilter('photo_id', photoIds);
+          likedPhotoIds = (likesResponse as List)
+              .map((like) => like['photo_id'] as String)
+              .toSet();
+        } catch (e) {
+          Logger.debug('Erro ao buscar likes: $e');
+        }
+      }
+
+      final photos = <PhotoModel>[];
+      for (final item in response) {
+        try {
+          final userData = item['users'] as Map<String, dynamic>?;
+          final photo = PhotoModel.fromJson(item);
+          if (blockedUserIds.contains(photo.userId)) continue;
+          final isLiked = currentUserId != null && likedPhotoIds.contains(photo.id);
+          photos.add(photo.copyWith(
+            username: userData?['username'] as String?,
+            userAvatarUrl: userData?['avatar_url'] as String?,
+            isLiked: isLiked,
+          ));
+        } catch (e, stackTrace) {
+          Logger.warning('Erro ao processar foto', e, stackTrace);
+        }
+      }
+      return photos;
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   Future<List<String>> getAvailableCategories() async {
     try {
-      // Buscar categorias distintas de fotos compartilhadas
+      // Buscar categorias distintas de fotos compartilhadas com score > 9
       final response = await _client
           .from('photos')
           .select('categoria')
           .eq('is_shared', true)
+          .gt('score', 9)
           .not('categoria', 'is', null);
 
       // Extrair categorias únicas e ordenar alfabeticamente

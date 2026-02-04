@@ -19,12 +19,16 @@ class PerfilModel extends FlutterFlowModel<PerfilWidget> {
   DateTime? planExpiresAt;
   bool isFreePlan = false;
   bool habilitarPlanos = false;
+  String? city;
+  String? state;
+  String? phone;
   
   bool isLoading = true;
   bool isUpdatingAvatar = false;
   bool isUpdatingUsername = false;
   bool isChangingPassword = false;
   bool isDeletingAccount = false;
+  bool isUpdatingContactInfo = false;
   String? errorMessage;
 
   @override

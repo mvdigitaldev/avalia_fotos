@@ -33,6 +33,8 @@ import '/signup/signup_widget.dart';
 import '/pages/conquistas/conquistas_widget.dart';
 // Import InspirarWidget explicitly
 import '/pages/inspirar/inspirar_widget.dart';
+// Import InspirarCategoriaWidget explicitly
+import '/pages/inspirar_categoria/inspirar_categoria_widget.dart';
 // Import NotificationsPage explicitly
 import '/pages/notifications/notifications_page.dart';
 // Import BlockedUsersWidget explicitly
@@ -45,6 +47,8 @@ import '/pages/premiacoes/premiacoes_widget.dart';
 import '/pages/admin/select_photo_of_day_widget.dart';
 // Import SendPushNotificationWidget explicitly
 import '/pages/admin/send_push_notification_widget.dart';
+// Import AdminManageUsersWidget explicitly
+import '/pages/admin/admin_manage_users_widget.dart';
 // Import ResetPasswordWidget explicitly
 import '/pages/reset_password/reset_password_widget.dart';
 // Import UserProfileWidget explicitly
@@ -319,6 +323,12 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) {
         requireAuth: true,
         builder: (context, params) => SendPushNotificationWidget(),
       ),
+      FFRoute(
+        name: AdminManageUsersWidget.routeName,
+        path: AdminManageUsersWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => AdminManageUsersWidget(),
+      ),
         FFRoute(
           name: LoginWidget.routeName,
           path: LoginWidget.routePath,
@@ -396,6 +406,12 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) {
         path: InspirarWidget.routePath,
         requireAuth: true,
         builder: (context, params) => InspirarWidget(),
+      ),
+      FFRoute(
+        name: InspirarCategoriaWidget.routeName,
+        path: InspirarCategoriaWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => InspirarCategoriaWidget(),
       ),
       FFRoute(
         name: NotificationsPage.routeName,

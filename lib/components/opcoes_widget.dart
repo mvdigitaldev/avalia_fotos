@@ -657,6 +657,53 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                 ),
               ),
             ),
+            // Item Gerenciar Usuários (apenas para admins)
+            if (_isAdmin)
+              Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 8.0),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    context.push('/admin/manage-users');
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Color(0x11868686),
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 8.0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.max,
+                        children: [
+                          Icon(
+                            Icons.manage_accounts,
+                            color: FlutterFlowTheme.of(context).primary,
+                            size: 24.0,
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 0.0, 0.0),
+                              child: Text(
+                                'Gerenciar Usuários',
+                                style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                      font: GoogleFonts.poppins(),
+                                      letterSpacing: 0.0,
+                                    ),
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.arrow_right_sharp,
+                            color: FlutterFlowTheme.of(context).primary,
+                            size: 24.0,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             Padding(
               padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 8.0),
               child: InkWell(

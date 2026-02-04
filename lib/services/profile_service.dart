@@ -283,7 +283,7 @@ class ProfileService {
       // Buscar dados do usuário
       final userResponse = await _client
           .from('users')
-          .select('created_at, username, email, avatar_url')
+          .select('created_at, username, email, avatar_url, city, state, phone')
           .eq('id', userId)
           .single();
 
@@ -340,6 +340,9 @@ class ProfileService {
         'plan_name': planName,
         'plan_expires_at': planExpiresAt,
         'is_free_plan': isFreePlan,
+        'city': userResponse['city'] as String?,
+        'state': userResponse['state'] as String?,
+        'phone': userResponse['phone'] as String?,
       };
     } catch (e, stackTrace) {
       Logger.error('Erro ao buscar estatísticas do perfil', e, stackTrace);
@@ -353,7 +356,7 @@ class ProfileService {
       // Buscar dados do usuário
       final userResponse = await _client
           .from('users')
-          .select('username, avatar_url, total_score')
+          .select('username, avatar_url, total_score, city, state, phone')
           .eq('id', userId)
           .maybeSingle();
 
@@ -367,16 +370,73 @@ class ProfileService {
       // Contar fotos compartilhadas
       final sharedPhotosCount = await _photoService.getUserSharedPhotosCount(userId);
 
+      // Verificar se usuário tem plano pago
+      bool hasPaidPlan = false;
+      try {
+        final paidResponse = await _client.rpc(
+          'get_users_paid_plan_status',
+          params: {'p_user_ids': [userId]},
+        );
+        if (paidResponse != null && paidResponse is List && paidResponse.isNotEmpty) {
+          final item = paidResponse.first;
+          if (item is Map<String, dynamic>) {
+            hasPaidPlan = item['has_paid_plan'] as bool? ?? false;
+          }
+        }
+      } catch (e) {
+        // Ignorar erro ao verificar plano
+      }
+
       return {
         'username': userResponse['username'] as String?,
         'avatar_url': userResponse['avatar_url'] as String?,
         'total_score': (userResponse['total_score'] ?? 0).toDouble(),
         'total_photos_evaluated': totalPhotos,
         'shared_photos_count': sharedPhotosCount,
+        'city': userResponse['city'] as String?,
+        'state': userResponse['state'] as String?,
+        'phone': userResponse['phone'] as String?,
+        'has_paid_plan': hasPaidPlan,
       };
     } catch (e, stackTrace) {
       Logger.error('Erro ao buscar perfil público do usuário', e, stackTrace);
       throw Exception('Erro ao buscar perfil: $e');
+    }
+  }
+
+  /// Atualiza informações de contato (cidade, estado, telefone)
+  Future<void> updateContactInfo({
+    String? city,
+    String? state,
+    String? phone,
+  }) async {
+    try {
+      if (currentUserId == null) {
+        throw Exception('Usuário não autenticado');
+      }
+
+      final updates = <String, dynamic>{};
+
+      if (city != null) {
+        updates['city'] = city.trim().isEmpty ? null : city.trim();
+      }
+      if (state != null) {
+        final normalized = state.trim().toUpperCase();
+        updates['state'] = normalized.isEmpty ? null : (normalized.length > 2 ? normalized.substring(0, 2) : normalized);
+      }
+      if (phone != null) {
+        updates['phone'] = phone.trim().isEmpty ? null : phone.trim();
+      }
+
+      if (updates.isEmpty) return;
+
+      await _client
+          .from('users')
+          .update(updates)
+          .eq('id', currentUserId!);
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao atualizar informações de contato', e, stackTrace);
+      throw Exception('Erro ao atualizar informações de contato: $e');
     }
   }
 }

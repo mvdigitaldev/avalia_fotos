@@ -103,6 +103,9 @@ class _PerfilWidgetState extends State<PerfilWidget> {
         _model.planExpiresAt = stats['plan_expires_at'] as DateTime?;
         _model.isFreePlan = stats['is_free_plan'] as bool? ?? false;
         _model.habilitarPlanos = habilitarPlanos;
+        _model.city = stats['city'] as String?;
+        _model.state = stats['state'] as String?;
+        _model.phone = stats['phone'] as String?;
         _model.isLoading = false;
       });
     } catch (e, stackTrace) {
@@ -281,6 +284,178 @@ class _PerfilWidgetState extends State<PerfilWidget> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erro ao atualizar username: $e'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _editContactInfo() async {
+    final cityController = TextEditingController(text: _model.city ?? '');
+    final stateController = TextEditingController(text: _model.state ?? '');
+    final phoneController = TextEditingController(text: _model.phone ?? '');
+
+    final result = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Container(
+          padding: EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 20.0),
+          decoration: BoxDecoration(
+            color: FlutterFlowTheme.of(context).secondaryBackground,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20.0),
+              topRight: Radius.circular(20.0),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Editar Informações de Contato',
+                style: FlutterFlowTheme.of(context).titleLarge.override(
+                      font: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      letterSpacing: 0.0,
+                    ),
+              ),
+              Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(0.0, 16.0, 0.0, 0.0),
+                child: TextField(
+                  controller: cityController,
+                  decoration: InputDecoration(
+                    labelText: 'Cidade',
+                    hintText: 'Digite sua cidade',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                  ),
+                  onChanged: (value) {
+                    if (value.length > 100) {
+                      cityController.text = value.substring(0, 100);
+                      cityController.selection = TextSelection.fromPosition(
+                        TextPosition(offset: cityController.text.length),
+                      );
+                    }
+                  },
+                ),
+              ),
+              Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(0.0, 16.0, 0.0, 0.0),
+                child: TextField(
+                  controller: stateController,
+                  decoration: InputDecoration(
+                    labelText: 'Estado (UF)',
+                    hintText: 'Ex: SP',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                  ),
+                  maxLength: 2,
+                  textCapitalization: TextCapitalization.characters,
+                  onChanged: (value) {
+                    stateController.text = value.toUpperCase();
+                    stateController.selection = TextSelection.fromPosition(
+                      TextPosition(offset: stateController.text.length),
+                    );
+                  },
+                ),
+              ),
+              Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(0.0, 16.0, 0.0, 16.0),
+                child: TextField(
+                  controller: phoneController,
+                  decoration: InputDecoration(
+                    labelText: 'Modelo de celular',
+                    hintText: 'Ex: iPhone 15, Samsung Galaxy',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                  ),
+                  keyboardType: TextInputType.text,
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text('Cancelar'),
+                  ),
+                  SizedBox(width: 8.0),
+                  FFButtonWidget(
+                    onPressed: () {
+                      Navigator.of(context).pop({
+                        'city': cityController.text.trim(),
+                        'state': stateController.text.trim(),
+                        'phone': phoneController.text.trim(),
+                      });
+                    },
+                    text: 'Salvar',
+                    options: FFButtonOptions(
+                      height: 40.0,
+                      padding: EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 0.0),
+                      color: FlutterFlowTheme.of(context).primary,
+                      textStyle: FlutterFlowTheme.of(context).titleSmall.override(
+                            font: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600,
+                            ),
+                            color: Colors.white,
+                            letterSpacing: 0.0,
+                          ),
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (result == null) return;
+
+    safeSetState(() {
+      _model.isUpdatingContactInfo = true;
+    });
+
+    try {
+      await _profileService.updateContactInfo(
+        city: result['city'],
+        state: result['state'],
+        phone: result['phone'],
+      );
+      safeSetState(() {
+        _model.city = result['city']!.isEmpty ? null : result['city'];
+        _model.state = result['state']!.isEmpty ? null : result['state'];
+        _model.phone = result['phone']!.isEmpty ? null : result['phone'];
+        _model.isUpdatingContactInfo = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Informações atualizadas com sucesso!'),
+            backgroundColor: FlutterFlowTheme.of(context).success,
+          ),
+        );
+      }
+    } catch (e) {
+      safeSetState(() {
+        _model.isUpdatingContactInfo = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao atualizar informações: $e'),
             backgroundColor: FlutterFlowTheme.of(context).error,
           ),
         );
@@ -1013,6 +1188,151 @@ class _PerfilWidgetState extends State<PerfilWidget> {
                                           color: FlutterFlowTheme.of(context).secondary,
                                           letterSpacing: 0.0,
                                         ),
+                                  ),
+                                ),
+                                // Informações de contato
+                                Padding(
+                                  padding: EdgeInsetsDirectional.fromSTEB(0.0, 16.0, 0.0, 0.0),
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: EdgeInsetsDirectional.fromSTEB(16.0, 16.0, 16.0, 16.0),
+                                    decoration: BoxDecoration(
+                                      color: FlutterFlowTheme.of(context).secondaryBackground,
+                                      borderRadius: BorderRadius.circular(12.0),
+                                      border: Border.all(
+                                        color: FlutterFlowTheme.of(context).alternate,
+                                        width: 1.0,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              'Informações de contato',
+                                              style: FlutterFlowTheme.of(context).titleSmall.override(
+                                                    font: GoogleFonts.poppins(
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                    letterSpacing: 0.0,
+                                                  ),
+                                            ),
+                                            if (_model.isUpdatingContactInfo)
+                                              SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child: CircularProgressIndicator(
+                                                  color: FlutterFlowTheme.of(context).primary,
+                                                  strokeWidth: 2,
+                                                ),
+                                              )
+                                            else
+                                              GestureDetector(
+                                                onTap: _editContactInfo,
+                                                child: Icon(
+                                                  Icons.edit,
+                                                  color: FlutterFlowTheme.of(context).primary,
+                                                  size: 20.0,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        if ((_model.city != null && _model.city!.isNotEmpty) ||
+                                            (_model.state != null && _model.state!.isNotEmpty) ||
+                                            (_model.phone != null && _model.phone!.isNotEmpty)) ...[
+                                          Padding(
+                                            padding: EdgeInsetsDirectional.fromSTEB(0.0, 12.0, 0.0, 0.0),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                if (_model.city != null && _model.city!.isNotEmpty)
+                                                  Padding(
+                                                    padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 4.0),
+                                                    child: Row(
+                                                      children: [
+                                                        Icon(
+                                                          Icons.location_city_outlined,
+                                                          color: FlutterFlowTheme.of(context).secondary,
+                                                          size: 18.0,
+                                                        ),
+                                                        Padding(
+                                                          padding: EdgeInsetsDirectional.fromSTEB(8.0, 0.0, 0.0, 0.0),
+                                                          child: Text(
+                                                            '${_model.city}${_model.state != null && _model.state!.isNotEmpty ? ' - ${_model.state}' : ''}',
+                                                            style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                                                  font: GoogleFonts.poppins(),
+                                                                  letterSpacing: 0.0,
+                                                                ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                if (_model.state != null && _model.state!.isNotEmpty && (_model.city == null || _model.city!.isEmpty))
+                                                  Padding(
+                                                    padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 4.0),
+                                                    child: Row(
+                                                      children: [
+                                                        Icon(
+                                                          Icons.map_outlined,
+                                                          color: FlutterFlowTheme.of(context).secondary,
+                                                          size: 18.0,
+                                                        ),
+                                                        Padding(
+                                                          padding: EdgeInsetsDirectional.fromSTEB(8.0, 0.0, 0.0, 0.0),
+                                                          child: Text(
+                                                            'UF: ${_model.state}',
+                                                            style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                                                  font: GoogleFonts.poppins(),
+                                                                  letterSpacing: 0.0,
+                                                                ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                if (_model.phone != null && _model.phone!.isNotEmpty)
+                                                  Padding(
+                                                    padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 4.0),
+                                                    child: Row(
+                                                      children: [
+                                                        Icon(
+                                                          Icons.smartphone,
+                                                          color: FlutterFlowTheme.of(context).secondary,
+                                                          size: 18.0,
+                                                        ),
+                                                        Padding(
+                                                          padding: EdgeInsetsDirectional.fromSTEB(8.0, 0.0, 0.0, 0.0),
+                                                          child: Text(
+                                                            _model.phone!,
+                                                            style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                                                  font: GoogleFonts.poppins(),
+                                                                  letterSpacing: 0.0,
+                                                                ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                        ] else
+                                          Padding(
+                                            padding: EdgeInsetsDirectional.fromSTEB(0.0, 8.0, 0.0, 0.0),
+                                            child: Text(
+                                              'Nenhuma informação preenchida',
+                                              style: FlutterFlowTheme.of(context).bodySmall.override(
+                                                    font: GoogleFonts.poppins(),
+                                                    color: FlutterFlowTheme.of(context).secondary,
+                                                    letterSpacing: 0.0,
+                                                  ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ],

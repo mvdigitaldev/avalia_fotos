@@ -14,6 +14,10 @@ class UserProfileModel extends FlutterFlowModel<UserProfileWidget> {
   int totalPhotosEvaluated = 0;
   int? rankingPosition;
   double? score;
+  String? city;
+  String? state;
+  String? phone;
+  bool hasPaidPlan = false;
   List<PhotoModel> photos = [];
   bool isLoading = false;
   bool isLoadingPhotos = false;

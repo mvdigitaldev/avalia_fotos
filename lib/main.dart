@@ -285,63 +285,91 @@ class _NavBarPageState extends State<NavBarPage> {
     };
     final currentIndex = tabs.keys.toList().indexOf(_currentPageName);
 
+    void onNavTap(int i) {
+      safeSetState(() {
+        _currentPage = null;
+        _currentPageName = tabs.keys.toList()[i];
+      });
+    }
+
+    Widget buildNavItem(int index, IconData iconData) {
+      final theme = FlutterFlowTheme.of(context);
+      final isSelected = currentIndex == index;
+      return Expanded(
+        child: InkWell(
+          onTap: () => onNavTap(index),
+          child: SizedBox(
+            height: 60,
+            child: Center(
+              child: Icon(
+                iconData,
+                size: 24.0,
+                color: isSelected ? theme.primary : theme.secondaryText,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       resizeToAvoidBottomInset: !widget.disableResizeToAvoidBottomInset,
       body: _currentPage ?? tabs[_currentPageName],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: currentIndex,
-        onTap: (i) => safeSetState(() {
-          _currentPage = null;
-          _currentPageName = tabs.keys.toList()[i];
-        }),
-        backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
-        selectedItemColor: FlutterFlowTheme.of(context).primary,
-        unselectedItemColor: FlutterFlowTheme.of(context).secondaryText,
-        showSelectedLabels: false,
-        showUnselectedLabels: false,
-        type: BottomNavigationBarType.fixed,
-        items: <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(
-              Icons.home_outlined,
-              size: 24.0,
-            ),
-            label: 'Home',
-            tooltip: '',
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          height: 60,
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF303030)
+                : const Color(0xFFFAFAFA),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(
-              Icons.dashboard_outlined,
-              size: 24.0,
-            ),
-            label: 'Home',
-            tooltip: '',
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.bottomCenter,
+            children: [
+              Row(
+                children: [
+                  buildNavItem(0, Icons.home_outlined),
+                  buildNavItem(1, Icons.dashboard_outlined),
+                  const Expanded(child: SizedBox()),
+                  buildNavItem(3, Icons.history),
+                  buildNavItem(4, Icons.workspace_premium),
+                ],
+              ),
+              Positioned(
+                top: -16,
+                bottom: 16,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () => onNavTap(2),
+                    child: Container(
+                      width: 62,
+                      height: 62,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: FlutterFlowTheme.of(context).primary,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0x26000000),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.image_outlined,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: Icon(
-              Icons.image_outlined,
-              size: 24.0,
-            ),
-            label: 'Home',
-            tooltip: '',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(
-              Icons.history,
-              size: 24.0,
-            ),
-            label: 'Home',
-            tooltip: '',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(
-              Icons.workspace_premium,
-              size: 24.0,
-            ),
-            label: 'Home',
-            tooltip: '',
-          )
-        ],
+        ),
       ),
     );
   }

@@ -8,6 +8,9 @@ class UserModel {
   final int photosCount;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? city;
+  final String? state;
+  final String? phone;
 
   UserModel({
     required this.id,
@@ -19,6 +22,9 @@ class UserModel {
     required this.photosCount,
     required this.createdAt,
     required this.updatedAt,
+    this.city,
+    this.state,
+    this.phone,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -32,6 +38,9 @@ class UserModel {
       photosCount: json['photos_count'] ?? 0,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
+      city: json['city'] as String?,
+      state: json['state'] as String?,
+      phone: json['phone'] as String?,
     );
   }
 
@@ -46,6 +55,9 @@ class UserModel {
       'photos_count': photosCount,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+      'city': city,
+      'state': state,
+      'phone': phone,
     };
   }
 
@@ -59,6 +71,9 @@ class UserModel {
     int? photosCount,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? city,
+    String? state,
+    String? phone,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -70,6 +85,9 @@ class UserModel {
       photosCount: photosCount ?? this.photosCount,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      city: city ?? this.city,
+      state: state ?? this.state,
+      phone: phone ?? this.phone,
     );
   }
 }

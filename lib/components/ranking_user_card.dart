@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import '../models/ranking_item_model.dart';
 import '../utils/logger.dart';
+import 'verified_badge.dart';
 
 class RankingUserCard extends StatelessWidget {
   final RankingItemModel user;
@@ -149,17 +150,29 @@ class RankingUserCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    user.username ?? 'Usuário',
-                    style: FlutterFlowTheme.of(context).titleMedium.override(
-                          font: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w600,
-                          ),
-                          fontSize: 16.0,
-                          letterSpacing: 0.0,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          user.username ?? 'Usuário',
+                          style: FlutterFlowTheme.of(context).titleMedium.override(
+                                font: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                fontSize: 16.0,
+                                letterSpacing: 0.0,
+                              ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                      ),
+                      if (user.hasPaidPlan)
+                        Padding(
+                          padding: EdgeInsetsDirectional.fromSTEB(6.0, 0.0, 0.0, 0.0),
+                          child: VerifiedBadge(size: VerifiedBadgeSize.small),
+                        ),
+                    ],
                   ),
                   SizedBox(height: 4.0),
                   Row(

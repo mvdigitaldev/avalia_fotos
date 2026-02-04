@@ -15,6 +15,7 @@ import '../../services/photo_of_the_day_service.dart';
 import '../../utils/logger.dart';
 import '../../models/photo_model.dart';
 import '../../components/photo_trophy_badge.dart';
+import '../../components/verified_badge.dart';
 import 'user_profile_model.dart';
 export 'user_profile_model.dart';
 
@@ -124,6 +125,10 @@ class _UserProfileWidgetState extends State<UserProfileWidget> {
         _model.totalPhotosEvaluated = profileData['total_photos_evaluated'] as int? ?? 0;
         _model.score = profileData['total_score'] as double?;
         _model.rankingPosition = rankingPosition;
+        _model.city = profileData['city'] as String?;
+        _model.state = profileData['state'] as String?;
+        _model.phone = profileData['phone'] as String?;
+        _model.hasPaidPlan = profileData['has_paid_plan'] as bool? ?? false;
         _model.isLoading = false;
       });
     } catch (e, stackTrace) {
@@ -338,15 +343,112 @@ class _UserProfileWidgetState extends State<UserProfileWidget> {
           ),
           SizedBox(height: 16),
           // Nome do usuário
-          Text(
-            _model.username ?? 'Usuário',
-            style: FlutterFlowTheme.of(context).headlineMedium.override(
-                  font: GoogleFonts.poppins(
-                    fontWeight: FontWeight.bold,
-                  ),
-                  letterSpacing: 0.0,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _model.username ?? 'Usuário',
+                style: FlutterFlowTheme.of(context).headlineMedium.override(
+                      font: GoogleFonts.poppins(
+                        fontWeight: FontWeight.bold,
+                      ),
+                      letterSpacing: 0.0,
+                    ),
+              ),
+              if (_model.hasPaidPlan) ...[
+                Padding(
+                  padding: EdgeInsetsDirectional.fromSTEB(8, 0, 0, 0),
+                  child: VerifiedBadge(size: VerifiedBadgeSize.medium),
                 ),
+              ],
+            ],
           ),
+          if ((_model.city != null && _model.city!.isNotEmpty) ||
+              (_model.state != null && _model.state!.isNotEmpty) ||
+              (_model.phone != null && _model.phone!.isNotEmpty)) ...[
+            Padding(
+              padding: EdgeInsetsDirectional.fromSTEB(0, 12, 0, 0),
+              child: Column(
+                children: [
+                  if (_model.city != null && _model.city!.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.location_city_outlined,
+                            color: FlutterFlowTheme.of(context).secondary,
+                            size: 16,
+                          ),
+                          Padding(
+                            padding: EdgeInsetsDirectional.fromSTEB(6, 0, 0, 0),
+                            child: Text(
+                              '${_model.city}${_model.state != null && _model.state!.isNotEmpty ? ' - ${_model.state}' : ''}',
+                              style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                    font: GoogleFonts.poppins(),
+                                    color: FlutterFlowTheme.of(context).secondary,
+                                    letterSpacing: 0.0,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (_model.state != null && _model.state!.isNotEmpty && (_model.city == null || _model.city!.isEmpty))
+                    Padding(
+                      padding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.map_outlined,
+                            color: FlutterFlowTheme.of(context).secondary,
+                            size: 16,
+                          ),
+                          Padding(
+                            padding: EdgeInsetsDirectional.fromSTEB(6, 0, 0, 0),
+                            child: Text(
+                              _model.state!,
+                              style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                    font: GoogleFonts.poppins(),
+                                    color: FlutterFlowTheme.of(context).secondary,
+                                    letterSpacing: 0.0,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (_model.phone != null && _model.phone!.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.smartphone,
+                            color: FlutterFlowTheme.of(context).secondary,
+                            size: 16,
+                          ),
+                          Padding(
+                            padding: EdgeInsetsDirectional.fromSTEB(6, 0, 0, 0),
+                            child: Text(
+                              _model.phone!,
+                              style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                    font: GoogleFonts.poppins(),
+                                    color: FlutterFlowTheme.of(context).secondary,
+                                    letterSpacing: 0.0,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
           SizedBox(height: 24),
           // Estatísticas
           Row(

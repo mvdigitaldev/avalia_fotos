@@ -5,6 +5,7 @@ class RankingItemModel {
   final double score;
   final int photosCount;
   final int position;
+  final bool hasPaidPlan;
 
   RankingItemModel({
     required this.userId,
@@ -13,9 +14,10 @@ class RankingItemModel {
     required this.score,
     required this.photosCount,
     required this.position,
+    this.hasPaidPlan = false,
   });
 
-  factory RankingItemModel.fromJson(Map<String, dynamic> json, int position) {
+  factory RankingItemModel.fromJson(Map<String, dynamic> json, int position, {bool hasPaidPlan = false}) {
     return RankingItemModel(
       userId: json['user_id'] as String,
       username: json['username'] as String?,
@@ -23,6 +25,7 @@ class RankingItemModel {
       score: (json['score'] ?? 0).toDouble(),
       photosCount: json['photos_count'] ?? 0,
       position: position,
+      hasPaidPlan: hasPaidPlan,
     );
   }
 
@@ -34,6 +37,7 @@ class RankingItemModel {
       'score': score,
       'photos_count': photosCount,
       'position': position,
+      'has_paid_plan': hasPaidPlan,
     };
   }
 }
