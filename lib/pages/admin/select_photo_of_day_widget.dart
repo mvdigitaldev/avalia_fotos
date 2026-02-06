@@ -377,8 +377,10 @@ class _SelectPhotoOfDayWidgetState extends State<SelectPhotoOfDayWidget> {
   }
 
   Widget _buildPhotoCard(PhotoModel photo) {
-    return Container(
-      margin: const EdgeInsetsDirectional.fromSTEB(0, 0, 0, 16),
+    return GestureDetector(
+      onTap: () => context.push('/photo-detail/${photo.id}'),
+      child: Container(
+        margin: const EdgeInsetsDirectional.fromSTEB(0, 0, 0, 16),
       decoration: BoxDecoration(
         color: FlutterFlowTheme.of(context).secondaryBackground,
         borderRadius: BorderRadius.circular(12),
@@ -564,6 +566,7 @@ class _SelectPhotoOfDayWidgetState extends State<SelectPhotoOfDayWidget> {
           ),
         ],
       ),
+    ),
     );
   }
 }

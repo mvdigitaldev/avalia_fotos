@@ -226,6 +226,11 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
     super.dispose();
   }
 
+  Widget _buildOptionIcon(Widget icon) => SizedBox(
+    width: 28,
+    child: Center(child: icon),
+  );
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -276,15 +281,17 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                     child: Row(
                       mainAxisSize: MainAxisSize.max,
                       children: [
-                        Icon(
-                          Icons.person,
-                          color: FlutterFlowTheme.of(context).primary,
-                          size: 24.0,
+                        _buildOptionIcon(
+                          Icon(
+                            Icons.person,
+                            color: FlutterFlowTheme.of(context).primary,
+                            size: 24.0,
+                          ),
                         ),
                         Expanded(
                           child: Padding(
                             padding: EdgeInsetsDirectional.fromSTEB(
-                                4.0, 0.0, 0.0, 0.0),
+                                12.0, 0.0, 0.0, 0.0),
                             child: Text(
                               'Perfil',
                               style: FlutterFlowTheme.of(context)
@@ -337,14 +344,15 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                     child: Row(
                       mainAxisSize: MainAxisSize.max,
                       children: [
-                        Stack(
-                          children: [
-                            Icon(
-                              Icons.notifications_outlined,
-                              color: FlutterFlowTheme.of(context).primary,
-                              size: 24.0,
-                            ),
-                            if (_unreadCount > 0)
+                        _buildOptionIcon(
+                          Stack(
+                            children: [
+                              Icon(
+                                Icons.notifications_outlined,
+                                color: FlutterFlowTheme.of(context).primary,
+                                size: 24.0,
+                              ),
+                              if (_unreadCount > 0)
                               Positioned(
                                 right: 0,
                                 top: 0,
@@ -371,10 +379,11 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                               ),
                           ],
                         ),
+                        ),
                         Expanded(
                           child: Padding(
                             padding: EdgeInsetsDirectional.fromSTEB(
-                                4.0, 0.0, 0.0, 0.0),
+                                12.0, 0.0, 0.0, 0.0),
                             child: Text(
                               'Notificações',
                               style: FlutterFlowTheme.of(context)
@@ -427,15 +436,17 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                     child: Row(
                       mainAxisSize: MainAxisSize.max,
                       children: [
-                        Icon(
-                          Icons.block_outlined,
-                          color: FlutterFlowTheme.of(context).primary,
-                          size: 24.0,
+                        _buildOptionIcon(
+                          Icon(
+                            Icons.block_outlined,
+                            color: FlutterFlowTheme.of(context).primary,
+                            size: 24.0,
+                          ),
                         ),
                         Expanded(
                           child: Padding(
                             padding: EdgeInsetsDirectional.fromSTEB(
-                                4.0, 0.0, 0.0, 0.0),
+                                12.0, 0.0, 0.0, 0.0),
                             child: Text(
                               'Usuários Bloqueados',
                               style: FlutterFlowTheme.of(context)
@@ -490,10 +501,12 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                       child: Row(
                         mainAxisSize: MainAxisSize.max,
                         children: [
-                          Icon(
-                            Icons.image,
-                            color: FlutterFlowTheme.of(context).primary,
-                            size: 24.0,
+                          _buildOptionIcon(
+                            Icon(
+                              Icons.image,
+                              color: FlutterFlowTheme.of(context).primary,
+                              size: 24.0,
+                            ),
                           ),
                           Expanded(
                             child: Padding(
@@ -537,10 +550,12 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                       child: Row(
                         mainAxisSize: MainAxisSize.max,
                         children: [
-                          Icon(
-                            Icons.send,
-                            color: FlutterFlowTheme.of(context).primary,
-                            size: 24.0,
+                          _buildOptionIcon(
+                            Icon(
+                              Icons.send,
+                              color: FlutterFlowTheme.of(context).primary,
+                              size: 24.0,
+                            ),
                           ),
                           Expanded(
                             child: Padding(
@@ -584,44 +599,46 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                       child: Row(
                         mainAxisSize: MainAxisSize.max,
                         children: [
-                          Stack(
-                            children: [
-                              Icon(
-                                Icons.report_problem_outlined,
-                                color: FlutterFlowTheme.of(context).primary,
-                                size: 24.0,
-                              ),
-                              if (_pendingReportsCount > 0)
-                                Positioned(
-                                  right: 0,
-                                  top: 0,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(2),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.red,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    constraints: const BoxConstraints(
-                                      minWidth: 12,
-                                      minHeight: 12,
-                                    ),
-                                    child: Text(
-                                      '$_pendingReportsCount',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.bold,
+                          _buildOptionIcon(
+                            Stack(
+                              children: [
+                                Icon(
+                                  Icons.report_problem_outlined,
+                                  color: FlutterFlowTheme.of(context).primary,
+                                  size: 24.0,
+                                ),
+                                if (_pendingReportsCount > 0)
+                                  Positioned(
+                                    right: 0,
+                                    top: 0,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
                                       ),
-                                      textAlign: TextAlign.center,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 12,
+                                        minHeight: 12,
+                                      ),
+                                      child: Text(
+                                        '$_pendingReportsCount',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
                                     ),
                                   ),
-                                ),
-                            ],
+                              ],
+                            ),
                           ),
                           Expanded(
                             child: Padding(
                               padding: EdgeInsetsDirectional.fromSTEB(
-                                  4.0, 0.0, 0.0, 0.0),
+                                  12.0, 0.0, 0.0, 0.0),
                               child: Text(
                                 'Denúncias',
                                 style: FlutterFlowTheme.of(context)
@@ -676,10 +693,12 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                       child: Row(
                         mainAxisSize: MainAxisSize.max,
                         children: [
-                          Icon(
-                            Icons.manage_accounts,
-                            color: FlutterFlowTheme.of(context).primary,
-                            size: 24.0,
+                          _buildOptionIcon(
+                            Icon(
+                              Icons.manage_accounts,
+                              color: FlutterFlowTheme.of(context).primary,
+                              size: 24.0,
+                            ),
                           ),
                           Expanded(
                             child: Padding(
@@ -719,16 +738,18 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                     padding: EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 8.0),
                     child: Row(
                       mainAxisSize: MainAxisSize.max,
-                      children: [
-                        Icon(
-                          Icons.emoji_events,
-                          color: FlutterFlowTheme.of(context).primary,
-                          size: 24.0,
+                        children: [
+                        _buildOptionIcon(
+                          Icon(
+                            Icons.emoji_events,
+                            color: FlutterFlowTheme.of(context).primary,
+                            size: 24.0,
+                          ),
                         ),
                         Expanded(
                           child: Padding(
                             padding: EdgeInsetsDirectional.fromSTEB(
-                                4.0, 0.0, 0.0, 0.0),
+                                12.0, 0.0, 0.0, 0.0),
                             child: Text(
                               'Conquistas',
                               style: FlutterFlowTheme.of(context)
@@ -781,11 +802,13 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                     padding: EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 8.0),
                     child: Row(
                       mainAxisSize: MainAxisSize.max,
-                      children: [
-                        Icon(
-                          FontAwesomeIcons.medal,
-                          color: FlutterFlowTheme.of(context).primary,
-                          size: 24.0,
+                        children: [
+                        _buildOptionIcon(
+                          Icon(
+                            FontAwesomeIcons.medal,
+                            color: FlutterFlowTheme.of(context).primary,
+                            size: 24.0,
+                          ),
                         ),
                         Expanded(
                           child: Padding(
@@ -829,16 +852,18 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                     padding: EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 8.0),
                     child: Row(
                       mainAxisSize: MainAxisSize.max,
-                      children: [
-                        Icon(
-                          Icons.auto_awesome,
-                          color: FlutterFlowTheme.of(context).primary,
-                          size: 24.0,
+                        children: [
+                        _buildOptionIcon(
+                          Icon(
+                            Icons.auto_awesome,
+                            color: FlutterFlowTheme.of(context).primary,
+                            size: 24.0,
+                          ),
                         ),
                         Expanded(
                           child: Padding(
                             padding: EdgeInsetsDirectional.fromSTEB(
-                                4.0, 0.0, 0.0, 0.0),
+                                12.0, 0.0, 0.0, 0.0),
                             child: Text(
                               'Para se Inspirar',
                               style: FlutterFlowTheme.of(context)
@@ -893,22 +918,24 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                     padding: EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 8.0),
                     child: Row(
                       mainAxisSize: MainAxisSize.max,
-                      children: [
-                        Icon(
-                          Theme.of(context).brightness == Brightness.dark
-                              ? Icons.light_mode
-                              : Icons.mode_night,
-                          color: FlutterFlowTheme.of(context).primary,
-                          size: 24.0,
+                        children: [
+                        _buildOptionIcon(
+                          Icon(
+                            Theme.of(context).brightness == Brightness.dark
+                                ? Icons.light_mode
+                                : Icons.mode_night,
+                            color: FlutterFlowTheme.of(context).primary,
+                            size: 24.0,
+                          ),
                         ),
                         Expanded(
                           child: Padding(
                             padding: EdgeInsetsDirectional.fromSTEB(
-                                4.0, 0.0, 0.0, 0.0),
+                                12.0, 0.0, 0.0, 0.0),
                             child: Text(
                               Theme.of(context).brightness == Brightness.dark
-                                  ? 'Light mode'
-                                  : 'Dark mode',
+                                  ? 'Modo Claro'
+                                  : 'Modo Escuro',
                               style: FlutterFlowTheme.of(context)
                                   .bodyMedium
                                   .override(
@@ -958,16 +985,18 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                     padding: EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 8.0),
                     child: Row(
                       mainAxisSize: MainAxisSize.max,
-                      children: [
-                        Icon(
-                          Icons.question_mark_sharp,
-                          color: FlutterFlowTheme.of(context).primary,
-                          size: 24.0,
+                        children: [
+                        _buildOptionIcon(
+                          Icon(
+                            Icons.question_mark_sharp,
+                            color: FlutterFlowTheme.of(context).primary,
+                            size: 24.0,
+                          ),
                         ),
                         Expanded(
                           child: Padding(
                             padding: EdgeInsetsDirectional.fromSTEB(
-                                4.0, 0.0, 0.0, 0.0),
+                                12.0, 0.0, 0.0, 0.0),
                             child: Text(
                               'Tutorial e suporte',
                               style: FlutterFlowTheme.of(context)
@@ -1067,15 +1096,20 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                             child: Row(
                               mainAxisSize: MainAxisSize.max,
                               children: [
-                                Icon(
-                                  Icons.monetization_on_rounded,
-                                  color: FlutterFlowTheme.of(context).primaryText,
-                                  size: 32.0,
+                                SizedBox(
+                                  width: 36,
+                                  child: Center(
+                                    child: Icon(
+                                      Icons.monetization_on_rounded,
+                                      color: FlutterFlowTheme.of(context).primaryText,
+                                      size: 32.0,
+                                    ),
+                                  ),
                                 ),
                                 Expanded(
                                   child: Padding(
                                     padding: EdgeInsetsDirectional.fromSTEB(
-                                        4.0, 0.0, 0.0, 0.0),
+                                        12.0, 0.0, 0.0, 0.0),
                                     child: Column(
                                       mainAxisSize: MainAxisSize.max,
                                       crossAxisAlignment: CrossAxisAlignment.start,

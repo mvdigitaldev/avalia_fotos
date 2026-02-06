@@ -266,6 +266,7 @@ class NavBarPage extends StatefulWidget {
 class _NavBarPageState extends State<NavBarPage> {
   String _currentPageName = 'feed';
   late Widget? _currentPage;
+  final ValueNotifier<int> _feedScrollToTopTrigger = ValueNotifier(0);
 
   @override
   void initState() {
@@ -275,9 +276,15 @@ class _NavBarPageState extends State<NavBarPage> {
   }
 
   @override
+  void dispose() {
+    _feedScrollToTopTrigger.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final tabs = {
-      'feed': FeedWidget(),
+      'feed': FeedWidget(scrollToTopTrigger: _feedScrollToTopTrigger),
       'painel': PainelWidget(),
       'avalia': AvaliaWidget(),
       'historico': HistoricoWidget(),
@@ -286,6 +293,9 @@ class _NavBarPageState extends State<NavBarPage> {
     final currentIndex = tabs.keys.toList().indexOf(_currentPageName);
 
     void onNavTap(int i) {
+      if (i == 0 && currentIndex == 0) {
+        _feedScrollToTopTrigger.value++;
+      }
       safeSetState(() {
         _currentPage = null;
         _currentPageName = tabs.keys.toList()[i];

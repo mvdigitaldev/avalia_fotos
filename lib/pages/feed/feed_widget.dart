@@ -17,6 +17,7 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../services/supabase_service.dart';
 import '../../services/photo_service.dart';
 import '../../services/auth_service.dart';
@@ -41,7 +42,9 @@ import 'feed_model.dart';
 export 'feed_model.dart';
 
 class FeedWidget extends StatefulWidget {
-  const FeedWidget({super.key});
+  const FeedWidget({super.key, this.scrollToTopTrigger});
+
+  final ValueNotifier<int>? scrollToTopTrigger;
 
   static String routeName = 'feed';
   static String routePath = '/feed';
@@ -82,11 +85,22 @@ class _FeedWidgetState extends State<FeedWidget> {
     ),
   );
 
+  void _onScrollToTopTrigger() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _model = createModel(context, () => FeedModel());
     _scrollController.addListener(_onScroll);
+    widget.scrollToTopTrigger?.addListener(_onScrollToTopTrigger);
     _initializeTimeagoLocale();
     _initializeServices();
   }
@@ -1018,6 +1032,7 @@ class _FeedWidgetState extends State<FeedWidget> {
 
   @override
   void dispose() {
+    widget.scrollToTopTrigger?.removeListener(_onScrollToTopTrigger);
     _stopAnimationTimer();
     _scrollController.dispose();
     _model.dispose();
@@ -1063,75 +1078,48 @@ class _FeedWidgetState extends State<FeedWidget> {
                           mainAxisSize: MainAxisSize.max,
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _getGreeting(),
-                                  style: FlutterFlowTheme.of(context)
-                                      .titleSmall
-                                      .override(
-                                        font: GoogleFonts.poppins(
-                                          fontWeight:
-                                              FlutterFlowTheme.of(context)
-                                                  .titleSmall
-                                                  .fontWeight,
-                                          fontStyle:
-                                              FlutterFlowTheme.of(context)
-                                                  .titleSmall
-                                                  .fontStyle,
-                                        ),
-                                        letterSpacing: 0.0,
-                                        fontWeight: FlutterFlowTheme.of(context)
-                                            .titleSmall
-                                            .fontWeight,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .titleSmall
-                                            .fontStyle,
-                                      ),
+                            SizedBox(
+                              width: 40,
+                              child: InkWell(
+                                splashColor: Colors.transparent,
+                                focusColor: Colors.transparent,
+                                hoverColor: Colors.transparent,
+                                highlightColor: Colors.transparent,
+                                onTap: () => context.go('/avalia'),
+                                child: Icon(
+                                  Icons.add,
+                                  color: FlutterFlowTheme.of(context).primaryText,
+                                  size: 24.0,
                                 ),
-                                Text(
-                                  _getMotivationalPhrase(),
-                                  style: FlutterFlowTheme.of(context)
-                                      .bodySmall
-                                      .override(
-                                        font: GoogleFonts.poppins(
-                                          fontWeight:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodySmall
-                                                  .fontWeight,
-                                          fontStyle:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodySmall
-                                                  .fontStyle,
-                                        ),
-                                        color: FlutterFlowTheme.of(context)
-                                            .secondary,
-                                        fontSize: 10.0,
-                                        letterSpacing: 0.0,
-                                        fontWeight: FlutterFlowTheme.of(context)
-                                            .bodySmall
-                                            .fontWeight,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .bodySmall
-                                            .fontStyle,
-                                      ),
-                                ),
-                              ],
+                              ),
                             ),
-                            InkWell(
-                              splashColor: Colors.transparent,
-                              focusColor: Colors.transparent,
-                              hoverColor: Colors.transparent,
-                              highlightColor: Colors.transparent,
-                              onTap: () async {
-                                scaffoldKey.currentState!.openEndDrawer();
-                              },
-                              child: Icon(
-                                Icons.menu,
-                                color: FlutterFlowTheme.of(context).primaryText,
-                                size: 24.0,
+                            Expanded(
+                              child: Center(
+                                child: SvgPicture.asset(
+                                  Theme.of(context).brightness == Brightness.dark
+                                      ? 'assets/images/avalia_dark.svg'
+                                      : 'assets/images/avalia_light.svg',
+                                  width: 120,
+                                  height: 28,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ),
+                            SizedBox(
+                              width: 40,
+                              child: InkWell(
+                                splashColor: Colors.transparent,
+                                focusColor: Colors.transparent,
+                                hoverColor: Colors.transparent,
+                                highlightColor: Colors.transparent,
+                                onTap: () {
+                                  scaffoldKey.currentState!.openEndDrawer();
+                                },
+                                child: Icon(
+                                  Icons.menu,
+                                  color: FlutterFlowTheme.of(context).primaryText,
+                                  size: 24.0,
+                                ),
                               ),
                             ),
                           ],
