@@ -18,6 +18,8 @@ class PhotoModel {
   final String? userAvatarUrl;
   final bool? isLiked;
   final bool? hasPaidPlan;
+  /// Preenchido pela query do feed (view feed_photos); evita N queries de "foto do dia".
+  final bool? isPhotoOfTheDay;
 
   PhotoModel({
     required this.id,
@@ -39,6 +41,7 @@ class PhotoModel {
     this.userAvatarUrl,
     this.isLiked,
     this.hasPaidPlan,
+    this.isPhotoOfTheDay,
   });
 
   factory PhotoModel.fromJson(Map<String, dynamic> json) {
@@ -52,34 +55,40 @@ class PhotoModel {
       }
     }
 
+    // Parsing seguro de datas (evita Null is not a subtype quando colunas ausentes no feed)
+    DateTime parseDateTime(dynamic v, DateTime fallback) {
+      if (v == null) return fallback;
+      if (v is String) return DateTime.tryParse(v) ?? fallback;
+      return fallback;
+    }
+
     return PhotoModel(
-      id: json['id'] as String,
-      userId: json['user_id'] as String,
-      imageUrl: json['image_url'] as String,
+      id: json['id'] as String? ?? '',
+      userId: json['user_id'] as String? ?? '',
+      imageUrl: json['image_url'] as String? ?? '',
       thumbnailUrl: json['thumbnail_url'] as String?,
-      score: json['score'] is String 
+      score: json['score'] is String
           ? double.tryParse(json['score'] as String) ?? 0.0
-          : (json['score'] ?? 0).toDouble(),
-      positivePoints: (json['positive_points'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          [],
-      improvementPoints: (json['improvement_points'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          [],
+          : (json['score'] != null ? (json['score'] as num).toDouble() : 0.0),
+      positivePoints: (json['positive_points'] is List)
+          ? (json['positive_points'] as List<dynamic>).map((e) => e.toString()).toList()
+          : [],
+      improvementPoints: (json['improvement_points'] is List)
+          ? (json['improvement_points'] as List<dynamic>).map((e) => e.toString()).toList()
+          : [],
       observacao: json['observacao'] as String?,
       categoria: json['categoria'] as String?,
       recado: json['recado'] as String?,
-      isShared: json['is_shared'] ?? false,
-      likesCount: json['likes_count'] ?? 0,
-      commentsCount: json['comments_count'] ?? 0,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      isShared: json['is_shared'] == true,
+      likesCount: (json['likes_count'] is int) ? json['likes_count'] as int : int.tryParse('${json['likes_count']}') ?? 0,
+      commentsCount: (json['comments_count'] is int) ? json['comments_count'] as int : int.tryParse('${json['comments_count']}') ?? 0,
+      createdAt: parseDateTime(json['created_at'], DateTime.now()),
+      updatedAt: parseDateTime(json['updated_at'], DateTime.now()),
       username: userData?['username'] as String? ?? json['username'] as String?,
       userAvatarUrl: userData?['avatar_url'] as String? ?? json['user_avatar_url'] as String?,
       isLiked: json['is_liked'] as bool?,
       hasPaidPlan: json['has_paid_plan'] as bool?,
+      isPhotoOfTheDay: json['is_photo_of_the_day'] as bool?,
     );
   }
 
@@ -123,6 +132,7 @@ class PhotoModel {
     String? userAvatarUrl,
     bool? isLiked,
     bool? hasPaidPlan,
+    bool? isPhotoOfTheDay,
   }) {
     return PhotoModel(
       id: id ?? this.id,
@@ -144,6 +154,7 @@ class PhotoModel {
       userAvatarUrl: userAvatarUrl ?? this.userAvatarUrl,
       isLiked: isLiked ?? this.isLiked,
       hasPaidPlan: hasPaidPlan ?? this.hasPaidPlan,
+      isPhotoOfTheDay: isPhotoOfTheDay ?? this.isPhotoOfTheDay,
     );
   }
 }

@@ -29,6 +29,7 @@ import '../../models/photo_model.dart';
 import '../../models/comment_model.dart';
 import '../../models/report_model.dart';
 import '../../utils/logger.dart';
+import '../../utils/request_logger.dart';
 import '../../components/banner_ad_widget.dart';
 import '../../components/interstitial_ad_manager.dart';
 import '../../components/photo_trophy_badge.dart';
@@ -36,6 +37,7 @@ import '../../components/verified_badge.dart';
 import '../../services/photo_of_the_day_service.dart';
 import '../../services/plan_service.dart';
 import '../../services/upgrade_prompt_service.dart';
+import '../../services/feed_cache.dart';
 import '../../components/upgrade_banner.dart';
 import '../../components/upgrade_post_card.dart';
 import 'feed_model.dart';
@@ -158,8 +160,19 @@ class _FeedWidgetState extends State<FeedWidget> {
       setState(() {
         _servicesInitialized = true;
       });
-      // Carregar feed após inicializar serviços
-      _loadFeed();
+
+      // PR7: usar cache se válido (TTL), senão carregar do servidor
+      final snapshot = FeedCache.instance.restore(userId);
+      if (snapshot != null) {
+        safeSetState(() {
+          _model.photos = snapshot.photos;
+          _model.currentPage = snapshot.currentPage;
+          _model.hasMore = snapshot.hasMore;
+        });
+        Logger.debug('Feed restaurado do cache (${snapshot.photos.length} fotos)');
+      } else {
+        _loadFeed();
+      }
     } catch (e, stackTrace) {
       Logger.error('Erro ao inicializar serviços', e, stackTrace);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -175,6 +188,10 @@ class _FeedWidgetState extends State<FeedWidget> {
     if (_model.isLoading || !_servicesInitialized) {
       Logger.debug('Feed não carregado: isLoading=${_model.isLoading}, servicesInitialized=$_servicesInitialized');
       return;
+    }
+
+    if (refresh) {
+      FeedCache.instance.clear();
     }
 
     safeSetState(() {
@@ -195,6 +212,13 @@ class _FeedWidgetState extends State<FeedWidget> {
 
       Logger.debug('Fotos recebidas: ${newPhotos.length}');
 
+      // PR4: instrumentação por pontos críticos (1 query feed + 1 RPC paid + 1 batch likes = 3)
+      final isInitialLoad = refresh || _model.currentPage == 0;
+      RequestLogger.logAction(
+        isInitialLoad ? RequestLogger.feedLoad : RequestLogger.feedScroll,
+        requestCount: 3,
+      );
+
       safeSetState(() {
         if (refresh) {
           _model.photos = newPhotos;
@@ -205,6 +229,8 @@ class _FeedWidgetState extends State<FeedWidget> {
         _model.currentPage++;
         _model.isLoading = false;
       });
+
+      FeedCache.instance.save(_authService.currentUser?.id, _model.photos, _model.currentPage, _model.hasMore);
     } catch (e, stackTrace) {
       Logger.error('Erro ao carregar feed', e, stackTrace);
       safeSetState(() {
@@ -260,6 +286,7 @@ class _FeedWidgetState extends State<FeedWidget> {
     // Fazer chamada ao banco em background
     try {
       await _photoService.toggleLike(photo.id);
+      RequestLogger.logAction(RequestLogger.like, requestCount: 1);
       // Sucesso - UI já está atualizada
     } catch (e) {
       // Reverter em caso de erro
@@ -556,10 +583,10 @@ class _FeedWidgetState extends State<FeedWidget> {
     final comments = await _photoService.getComments(photo.id);
     final commentModels = comments.map((c) => CommentModel.fromJson(c)).toList();
     final currentUserId = _authService.currentUser?.id;
-    
+
     if (!mounted) return;
-    
-    showModalBottomSheet(
+
+    final didAddComment = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -568,26 +595,19 @@ class _FeedWidgetState extends State<FeedWidget> {
         initialComments: commentModels,
         photoService: _photoService,
         currentUserId: currentUserId,
-        onCommentAdded: () {
-          // Recarregar comentários e atualizar contador
-          _refreshPhotoComments(photo.id);
-        },
       ),
     );
-  }
 
-  Future<void> _refreshPhotoComments(String photoId) async {
-    try {
-      // Buscar foto atualizada para pegar o novo contador de comentários
-      final updatedPhoto = await _photoService.getPhotoById(photoId);
+    if (!mounted) return;
+    if (didAddComment == true) {
       safeSetState(() {
-        final index = _model.photos.indexWhere((p) => p.id == photoId);
+        final index = _model.photos.indexWhere((p) => p.id == photo.id);
         if (index != -1) {
-          _model.photos[index] = updatedPhoto;
+          _model.photos[index] = _model.photos[index].copyWith(
+            commentsCount: _model.photos[index].commentsCount + 1,
+          );
         }
       });
-    } catch (e, stackTrace) {
-      Logger.warning('Erro ao atualizar comentários', e, stackTrace);
     }
   }
 
@@ -733,22 +753,15 @@ class _FeedWidgetState extends State<FeedWidget> {
         'Accept': 'image/*',
       },
         ),
-        // Badge de troféu se for foto do dia
-        FutureBuilder<bool>(
-          future: _isPhotoOfTheDay(photo.id, photo.createdAt),
-          builder: (context, snapshot) {
-            if (snapshot.data == true) {
-              return Positioned(
-                top: 12,
-                right: 12,
-                child: PhotoTrophyBadge(
-                  size: TrophyBadgeSize.medium,
-                ),
-              );
-            }
-            return const SizedBox.shrink();
-          },
-        ),
+        // Badge de troféu se for foto do dia (vem na query do feed via view feed_photos)
+        if (photo.isPhotoOfTheDay == true)
+          Positioned(
+            top: 12,
+            right: 12,
+            child: PhotoTrophyBadge(
+              size: TrophyBadgeSize.medium,
+            ),
+          ),
         // Animação de coração para double tap
         Positioned.fill(
           child: Center(
@@ -1302,14 +1315,12 @@ class _CommentsBottomSheet extends StatefulWidget {
   final PhotoModel photo;
   final List<CommentModel> initialComments;
   final PhotoService photoService;
-  final VoidCallback onCommentAdded;
   final String? currentUserId;
 
   const _CommentsBottomSheet({
     required this.photo,
     required this.initialComments,
     required this.photoService,
-    required this.onCommentAdded,
     required this.currentUserId,
   });
 
@@ -1323,6 +1334,7 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
   List<CommentModel> _comments = [];
   bool _isLoading = false;
   bool _isSubmitting = false;
+  bool _didAddComment = false;
 
   @override
   void initState() {
@@ -1394,9 +1406,9 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
 
       _commentController.clear();
       await _loadComments();
-      widget.onCommentAdded();
-
+      RequestLogger.logAction(RequestLogger.commentAdd, requestCount: 2);
       if (mounted) {
+        _didAddComment = true;
         // Scroll para o topo para ver o novo comentário
         _scrollController.animateTo(
           0,
@@ -1477,7 +1489,6 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
     try {
       await widget.photoService.deleteComment(comment.id, widget.photo.id);
       await _loadComments();
-      widget.onCommentAdded();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1570,7 +1581,7 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => Navigator.of(context).pop(_didAddComment),
                   color: FlutterFlowTheme.of(context).primaryText,
                 ),
               ],

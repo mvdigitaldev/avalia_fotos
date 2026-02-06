@@ -37,17 +37,28 @@ class PhotoService {
         }
       }
 
-      // Se houver usuários bloqueados, aplicar filtro na query
+      // View feed_photos: select mínimo + is_photo_of_the_day (zero request extra por item)
       var query = _client
-          .from('photos')
+          .from('feed_photos')
           .select('''
-            *,
+            id,
+            user_id,
+            image_url,
+            thumbnail_url,
+            score,
+            recado,
+            is_shared,
+            likes_count,
+            comments_count,
+            created_at,
+            updated_at,
+            categoria,
+            is_photo_of_the_day,
             users:user_id (
               username,
               avatar_url
             )
-          ''')
-          .eq('is_shared', true);
+          ''');
 
       // Filtrar usuários bloqueados usando NOT IN (se houver bloqueios)
       if (blockedUserIds.isNotEmpty && currentUserId != null) {
