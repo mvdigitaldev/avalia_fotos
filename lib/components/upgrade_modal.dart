@@ -4,7 +4,7 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:go_router/go_router.dart';
+import '../utils/plans_navigation_helper.dart';
 
 class UpgradeModal {
   static Future<void> show(
@@ -15,6 +15,7 @@ class UpgradeModal {
     VoidCallback? onUpgrade,
     VoidCallback? onDismiss,
   }) async {
+    final parentContext = context;
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -143,14 +144,14 @@ class UpgradeModal {
               child: Column(
                 children: [
                   FFButtonWidget(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      if (onUpgrade != null) {
-                        onUpgrade();
-                      } else {
-                        context.push('/plans_assas');
-                      }
-                    },
+onPressed: () {
+                        Navigator.of(context).pop();
+                        if (onUpgrade != null) {
+                          onUpgrade();
+                        } else {
+                          PlansNavigationHelper.navigateToPlans(parentContext);
+                        }
+                      },
                     text: 'Ver Planos',
                     options: FFButtonOptions(
                       width: double.infinity,

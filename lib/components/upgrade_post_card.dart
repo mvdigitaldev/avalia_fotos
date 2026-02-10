@@ -4,7 +4,7 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:go_router/go_router.dart';
+import '../utils/plans_navigation_helper.dart';
 
 class UpgradePostCard extends StatelessWidget {
   const UpgradePostCard({
@@ -104,9 +104,7 @@ class UpgradePostCard extends StatelessWidget {
 
   Widget _buildCtaButton(BuildContext context) {
     return FFButtonWidget(
-      onPressed: onUpgrade ?? () {
-        context.push('/plans_assas');
-      },
+      onPressed: onUpgrade ?? () => PlansNavigationHelper.navigateToPlans(context),
       text: 'Ver Planos Disponíveis',
       options: FFButtonOptions(
         width: double.infinity,

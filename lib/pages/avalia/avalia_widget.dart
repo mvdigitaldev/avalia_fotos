@@ -23,6 +23,7 @@ import '../../components/interstitial_ad_manager.dart';
 import '../../services/upgrade_prompt_service.dart';
 import '../../components/upgrade_modal.dart';
 import '../../components/upgrade_banner.dart';
+import '../../utils/plans_navigation_helper.dart';
 import 'package:go_router/go_router.dart';
 import 'avalia_model.dart';
 export 'avalia_model.dart';
@@ -1132,9 +1133,7 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
                                         Padding(
                                           padding: EdgeInsetsDirectional.fromSTEB(0, 12, 0, 0),
                                           child: FFButtonWidget(
-                                            onPressed: () {
-                                              context.push('/plans');
-                                            },
+                                            onPressed: () => PlansNavigationHelper.navigateToPlans(context),
                                             text: 'Fazer Upgrade',
                                             options: FFButtonOptions(
                                               width: double.infinity,

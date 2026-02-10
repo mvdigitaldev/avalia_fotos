@@ -9,6 +9,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../services/supabase_service.dart';
@@ -16,6 +18,7 @@ import '../../services/profile_service.dart';
 import '../../utils/logger.dart';
 import '../../services/auth_service.dart';
 import '../../components/upgrade_modal.dart';
+import '../../utils/plans_navigation_helper.dart';
 import 'perfil_model.dart';
 export 'perfil_model.dart';
 
@@ -128,12 +131,40 @@ class _PerfilWidgetState extends State<PerfilWidget> {
       );
 
       if (image == null) return;
+      if (!mounted) return;
+
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: image.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        compressQuality: 85,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Recortar foto',
+            cropStyle: CropStyle.circle,
+            lockAspectRatio: true,
+            initAspectRatio: CropAspectRatioPreset.square,
+          ),
+          IOSUiSettings(
+            title: 'Recortar foto',
+            cropStyle: CropStyle.circle,
+            aspectRatioLockEnabled: true,
+          ),
+          if (kIsWeb)
+            WebUiSettings(
+              context: context,
+              initialAspectRatio: 1,
+            ),
+        ],
+      );
+
+      if (croppedFile == null) return;
+      if (!mounted) return;
 
       safeSetState(() {
         _model.isUpdatingAvatar = true;
       });
 
-      final imageFile = File(image.path);
+      final imageFile = File(croppedFile.path);
       final newAvatarUrl = await _profileService.updateAvatar(imageFile);
 
       safeSetState(() {
@@ -1438,7 +1469,7 @@ class _PerfilWidgetState extends State<PerfilWidget> {
                                                     padding: EdgeInsetsDirectional.fromSTEB(0.0, 12.0, 0.0, 0.0),
                                                     child: FFButtonWidget(
                                                       onPressed: () {
-                                                        context.push('/plans');
+                                                        PlansNavigationHelper.navigateToPlans(context);
                                                       },
                                                       text: 'Ver Planos Disponíveis',
                                                       icon: Icon(

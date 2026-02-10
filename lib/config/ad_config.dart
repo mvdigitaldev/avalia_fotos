@@ -1,14 +1,20 @@
 // lib/config/ad_config.dart
 import 'dart:io';
 
+/// Constantes de fallback quando o Supabase não retorna a configuração.
+/// Usadas por AdService quando a query falha ou retorna vazio.
 class AdConfig {
-  // Test ad unit IDs (substituir por IDs reais do AdMob antes de produção)
+  static const String bannerAdUnitIdAndroid = 'ca-app-pub-3940256099942544/6300978111';
+  static const String bannerAdUnitIdIos = 'ca-app-pub-3940256099942544/2934735716';
+  static const String interstitialAdUnitIdAndroid = 'ca-app-pub-3940256099942544/1033173712';
+  static const String interstitialAdUnitIdIos = 'ca-app-pub-3940256099942544/4411468910';
+
   static String get bannerAdUnitId => Platform.isAndroid
-      ? 'ca-app-pub-3940256099942544/6300978111' // Android test
-      : 'ca-app-pub-3940256099942544/2934735716'; // iOS test
-      
+      ? bannerAdUnitIdAndroid
+      : bannerAdUnitIdIos;
+
   static String get interstitialAdUnitId => Platform.isAndroid
-      ? 'ca-app-pub-3940256099942544/1033173712' // Android test
-      : 'ca-app-pub-3940256099942544/4411468910'; // iOS test
+      ? interstitialAdUnitIdAndroid
+      : interstitialAdUnitIdIos;
 }
 

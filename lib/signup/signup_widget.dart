@@ -57,6 +57,10 @@ class _SignupWidgetState extends State<SignupWidget> {
     _authService = AuthService(supabaseService);
   }
 
+  String _normalizeUsername(String text) {
+    return text.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+  }
+
   Future<void> _openTerms() async {
     const termsUrl = 'https://www.avaliafotos.com.br/termos-de-uso';
     try {
@@ -108,7 +112,8 @@ class _SignupWidgetState extends State<SignupWidget> {
       return;
     }
 
-    if (_model.textController2?.text.isEmpty ?? true) {
+    final normalizedUsername = _normalizeUsername(_model.textController2?.text ?? '');
+    if (normalizedUsername.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor, insira seu username')),
       );
@@ -153,7 +158,7 @@ class _SignupWidgetState extends State<SignupWidget> {
       await _authService.signUpWithEmail(
         email: _model.textController1!.text.trim(),
         password: _model.textController3!.text,
-        username: _model.textController2!.text.trim(),
+        username: normalizedUsername,
       );
 
       if (mounted) {
@@ -321,8 +326,8 @@ class _SignupWidgetState extends State<SignupWidget> {
                           autofocus: false,
                           obscureText: false,
                           decoration: InputDecoration(
-                            labelText: 'Username',
-                            hintText: 'Digite seu username',
+                            labelText: 'Nome do usuario',
+                            hintText: 'Ex: fabiano_martins',
                             hintStyle: FlutterFlowTheme.of(context).bodySmall.override(
                                   font: GoogleFonts.poppins(),
                                   letterSpacing: 0.0,
@@ -364,6 +369,15 @@ class _SignupWidgetState extends State<SignupWidget> {
                               ),
                           cursorColor: FlutterFlowTheme.of(context).primaryText,
                           validator: _model.textController2Validator.asValidator(context),
+                          onEditingComplete: () {
+                            final raw = _model.textController2!.text;
+                            final normalized = _normalizeUsername(raw);
+                            if (raw != normalized) {
+                              _model.textController2!.text = normalized;
+                              _model.textController2!.selection = TextSelection.collapsed(offset: normalized.length);
+                              setState(() {});
+                            }
+                          },
                         ),
                       ),
                       // Campo Senha

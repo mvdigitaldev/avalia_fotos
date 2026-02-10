@@ -4,7 +4,7 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:go_router/go_router.dart';
+import '../utils/plans_navigation_helper.dart';
 
 class UpgradeBanner extends StatelessWidget {
   const UpgradeBanner({
@@ -71,9 +71,7 @@ class UpgradeBanner extends StatelessWidget {
                 Padding(
                   padding: EdgeInsetsDirectional.fromSTEB(0, 12, 0, 0),
                   child: FFButtonWidget(
-                    onPressed: () {
-                      context.push('/plans_assas');
-                    },
+                    onPressed: () => PlansNavigationHelper.navigateToPlans(context),
                     text: ctaText ?? 'Ver Planos',
                     options: FFButtonOptions(
                       height: 36,

@@ -8,6 +8,7 @@ import '../../services/supabase_service.dart';
 import '../../services/photo_service.dart';
 import '../../services/plan_service.dart';
 import '../../utils/logger.dart';
+import '../../utils/plans_navigation_helper.dart';
 import 'inspirar_model.dart';
 export 'inspirar_model.dart';
 
@@ -196,7 +197,7 @@ class _InspirarWidgetState extends State<InspirarWidget> {
             Padding(
               padding: EdgeInsetsDirectional.fromSTEB(0, 24, 0, 0),
               child: ElevatedButton.icon(
-                onPressed: () => context.push('/plans'),
+                onPressed: () => PlansNavigationHelper.navigateToPlans(context),
                 icon: Icon(
                   Icons.star_outline,
                   color: Colors.white,

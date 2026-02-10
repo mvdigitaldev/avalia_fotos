@@ -13,6 +13,7 @@ import '../../services/plan_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/photo_of_the_day_model.dart';
 import '../../utils/logger.dart';
+import '../../utils/plans_navigation_helper.dart';
 import '../../components/photo_trophy_badge.dart';
 import 'premiacoes_model.dart';
 export 'premiacoes_model.dart';
@@ -668,9 +669,7 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
             ),
             const SizedBox(height: 32),
             ElevatedButton(
-              onPressed: () {
-                context.push('/plans');
-              },
+              onPressed: () => PlansNavigationHelper.navigateToPlans(context),
               style: ElevatedButton.styleFrom(
                 backgroundColor: FlutterFlowTheme.of(context).primary,
                 padding: const EdgeInsetsDirectional.fromSTEB(24, 12, 24, 12),

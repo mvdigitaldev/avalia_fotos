@@ -275,9 +275,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -383,8 +387,7 @@
 				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/RunnerProfile.entitlements;
-				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
-				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 6MJUMLUKLL;
 				ENABLE_BITCODE = NO;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -400,6 +403,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/Flutter",
 				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.mycompany.avaliafotos;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -522,8 +526,7 @@
 				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/RunnerDebug.entitlements;
-				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
-				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 6MJUMLUKLL;
 				ENABLE_BITCODE = NO;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -539,6 +542,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/Flutter",
 				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.mycompany.avaliafotos;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -556,8 +560,7 @@
 				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/RunnerRelease.entitlements;
-				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
-				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 6MJUMLUKLL;
 				ENABLE_BITCODE = NO;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -573,6 +576,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/Flutter",
 				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.mycompany.avaliafotos;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";

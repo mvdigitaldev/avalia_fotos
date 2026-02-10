@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import '../config/ad_config.dart';
 import '../services/ad_service.dart';
 import '../utils/logger.dart';
 
@@ -61,8 +60,11 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
       return;
     }
 
+    final adUnitId = await widget.adService.getBannerAdUnitId();
+    if (adUnitId.isEmpty) return;
+
     _bannerAd = BannerAd(
-      adUnitId: AdConfig.bannerAdUnitId,
+      adUnitId: adUnitId,
       size: widget.adSize ?? AdSize.banner,
       request: const AdRequest(),
       listener: BannerAdListener(

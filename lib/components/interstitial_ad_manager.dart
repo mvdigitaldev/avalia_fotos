@@ -1,8 +1,6 @@
 // lib/components/interstitial_ad_manager.dart
-import 'dart:io';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import '../config/ad_config.dart';
 import '../services/ad_service.dart';
 import '../utils/logger.dart';
 
@@ -31,11 +29,17 @@ class InterstitialAdManager {
       return;
     }
 
+    final adUnitId = await adService.getInterstitialAdUnitId();
+    if (adUnitId.isEmpty) {
+      _isLoading = false;
+      return;
+    }
+
     _isLoading = true;
 
     try {
       await InterstitialAd.load(
-        adUnitId: AdConfig.interstitialAdUnitId,
+        adUnitId: adUnitId,
         request: const AdRequest(),
         adLoadCallback: InterstitialAdLoadCallback(
           onAdLoaded: (ad) {

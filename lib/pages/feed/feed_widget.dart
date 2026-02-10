@@ -40,6 +40,7 @@ import '../../services/upgrade_prompt_service.dart';
 import '../../services/feed_cache.dart';
 import '../../components/upgrade_banner.dart';
 import '../../components/upgrade_post_card.dart';
+import '../../utils/plans_navigation_helper.dart';
 import 'feed_model.dart';
 export 'feed_model.dart';
 
@@ -809,9 +810,7 @@ class _FeedWidgetState extends State<FeedWidget> {
         final variant = ((block - 1) % 3) + 1;
         items.add(UpgradePostCard(
           variant: variant,
-          onUpgrade: () {
-            context.push('/plans_assas');
-          },
+          onUpgrade: () => PlansNavigationHelper.navigateToPlans(context),
         ));
       }
     }
