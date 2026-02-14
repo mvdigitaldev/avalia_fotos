@@ -326,8 +326,8 @@ class _SignupWidgetState extends State<SignupWidget> {
                           autofocus: false,
                           obscureText: false,
                           decoration: InputDecoration(
-                            labelText: 'Nome do usuario',
-                            hintText: 'Ex: fabiano_martins',
+                            labelText: 'Seu nome e sobrenome',
+                            hintText: 'Ex: fabianomartins (tudo junto)',
                             hintStyle: FlutterFlowTheme.of(context).bodySmall.override(
                                   font: GoogleFonts.poppins(),
                                   letterSpacing: 0.0,
@@ -389,8 +389,8 @@ class _SignupWidgetState extends State<SignupWidget> {
                           autofocus: false,
                           obscureText: !_model.passwordVisibility1,
                           decoration: InputDecoration(
-                            labelText: 'Senha',
-                            hintText: 'Digite sua senha',
+                            labelText: 'Crie uma Senha',
+                            hintText: 'Escolha uma senha fácil de pelo menos 6 digitos',
                             hintStyle: FlutterFlowTheme.of(context).bodySmall.override(
                                   font: GoogleFonts.poppins(),
                                   letterSpacing: 0.0,
