@@ -77,6 +77,38 @@ class StorageService {
     }
   }
 
+  /// Upload image for an announcement (bucket 'announcements').
+  Future<String> uploadAnnouncementImage({
+    required File imageFile,
+    required String userId,
+  }) async {
+    try {
+      final fileSize = await imageFile.length();
+      if (fileSize > maxFileSize) {
+        throw Exception('Arquivo muito grande. Tamanho máximo: 10MB');
+      }
+      final fileName = imageFile.path.split('/').last.toLowerCase();
+      final extension = fileName.split('.').last;
+      if (!allowedExtensions.contains(extension)) {
+        throw Exception(
+          'Formato não permitido. Use: ${allowedExtensions.join(", ")}',
+        );
+      }
+      final uniqueFileName = '$userId/${DateTime.now().millisecondsSinceEpoch}.$extension';
+      await _client.storage.from('announcements').upload(
+            uniqueFileName,
+            imageFile,
+            fileOptions: const FileOptions(upsert: false, cacheControl: '3600'),
+          );
+      return _client.storage.from('announcements').getPublicUrl(uniqueFileName);
+    } catch (e) {
+      if (e is StorageException) {
+        throw Exception('Erro ao fazer upload: ${e.message}');
+      }
+      throw Exception('Erro ao fazer upload: $e');
+    }
+  }
+
   Future<void> deletePhoto(String imageUrl) async {
     try {
       // Extrair o caminho do arquivo da URL

@@ -530,6 +530,25 @@ class NotificationService {
             }
           });
         }
+      } else if (type == 'announcement') {
+        final announcementId = data['announcement_id'] as String?;
+        if (announcementId != null && announcementId.isNotEmpty) {
+          final linkToNavigate = '/avisos/$announcementId';
+          Logger.info('Deep link para aviso: $linkToNavigate');
+          Future.delayed(const Duration(milliseconds: 500), () {
+            try {
+              final context = appNavigatorKey.currentContext;
+              if (context != null) {
+                final router = GoRouter.of(context);
+                router.push(linkToNavigate);
+              } else {
+                Logger.warning('Contexto não disponível para navegação');
+              }
+            } catch (e) {
+              Logger.warning('Erro ao navegar para deep link: $e');
+            }
+          });
+        }
       }
     } catch (e, stackTrace) {
       Logger.error('Erro ao processar deep link', e, stackTrace);

@@ -14,6 +14,7 @@ import '../../services/report_service.dart';
 import '../../services/plan_service.dart';
 import '../../utils/logger.dart';
 import '../../services/notification_service.dart';
+import '../../services/announcement_service.dart';
 import 'opcoes_model.dart';
 export 'opcoes_model.dart';
 
@@ -33,6 +34,7 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
   bool isLoadingPlan = true;
   bool isFreePlan = false;
   int _unreadCount = 0;
+  int _unreadAnnouncementsCount = 0;
   int _pendingReportsCount = 0;
   bool _isAdmin = false;
   bool _hasActivePlan = false;
@@ -51,6 +53,7 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
     _model = createModel(context, () => OpcoesModel());
     _loadPlanInfo();
     _loadUnreadCount();
+    _loadUnreadAnnouncementsCount();
     _initializeReportService();
     _checkUserHasActivePlan();
   }
@@ -93,6 +96,21 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
       }
     } catch (e) {
       Logger.error('Erro ao carregar contagem de notificações', e);
+    }
+  }
+
+  Future<void> _loadUnreadAnnouncementsCount() async {
+    try {
+      final supabaseService = await SupabaseService.getInstance();
+      final service = AnnouncementService(supabaseService);
+      final count = await service.getUnreadCount();
+      if (mounted) {
+        setState(() {
+          _unreadAnnouncementsCount = count;
+        });
+      }
+    } catch (e) {
+      Logger.error('Erro ao carregar contagem de avisos', e);
     }
   }
 
@@ -386,6 +404,98 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                                 12.0, 0.0, 0.0, 0.0),
                             child: Text(
                               'Notificações',
+                              style: FlutterFlowTheme.of(context)
+                                  .bodyMedium
+                                  .override(
+                                    font: GoogleFonts.poppins(
+                                      fontWeight: FlutterFlowTheme.of(context)
+                                          .bodyMedium
+                                          .fontWeight,
+                                      fontStyle: FlutterFlowTheme.of(context)
+                                          .bodyMedium
+                                          .fontStyle,
+                                    ),
+                                    letterSpacing: 0.0,
+                                    fontWeight: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .fontWeight,
+                                    fontStyle: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .fontStyle,
+                                  ),
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_right_sharp,
+                          color: FlutterFlowTheme.of(context).primary,
+                          size: 24.0,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 8.0),
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).pop(); // Fechar drawer
+                  context.push('/avisos');
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Color(0x11868686),
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 8.0),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.max,
+                      children: [
+                        _buildOptionIcon(
+                          Stack(
+                            children: [
+                              Icon(
+                                Icons.campaign_outlined,
+                                color: FlutterFlowTheme.of(context).primary,
+                                size: 24.0,
+                              ),
+                              if (_unreadAnnouncementsCount > 0)
+                              Positioned(
+                                right: 0,
+                                top: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 12,
+                                    minHeight: 12,
+                                  ),
+                                  child: Text(
+                                    '$_unreadAnnouncementsCount',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsetsDirectional.fromSTEB(
+                                12.0, 0.0, 0.0, 0.0),
+                            child: Text(
+                              'Avisos',
                               style: FlutterFlowTheme.of(context)
                                   .bodyMedium
                                   .override(

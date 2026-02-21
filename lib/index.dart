@@ -15,6 +15,8 @@ export '/pages/tutorial_suporte/tutorial_suporte_widget.dart' show TutorialSupor
 export '/pages/conquistas/conquistas_widget.dart' show ConquistasWidget;
 export '/pages/inspirar/inspirar_widget.dart' show InspirarWidget;
 export '/pages/inspirar_categoria/inspirar_categoria_widget.dart' show InspirarCategoriaWidget;
+export '/pages/avisos/avisos_page.dart' show AvisosPage;
+export '/pages/avisos/aviso_detail_page.dart' show AvisoDetailPage;
 export '/pages/reports/reports_widget.dart' show ReportsWidget;
 export '/pages/privacy/privacy_widget.dart' show PrivacyWidget;
 export '/pages/terms/terms_widget.dart' show TermsWidget;
