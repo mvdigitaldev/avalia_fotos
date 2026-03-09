@@ -48,6 +48,25 @@ class PlanService {
     }
   }
 
+  /// Mês/ano atual em America/Sao_Paulo (fonte única para regras de negócio)
+  Future<({int month, int year})> getCurrentBusinessMonthYear() async {
+    try {
+      final r = await _client.rpc('get_current_business_month_year');
+      if (r == null || r is! List || r.isEmpty) {
+        final now = DateTime.now();
+        return (month: now.month, year: now.year);
+      }
+      final row = (r as List).first as Map<String, dynamic>;
+      return (
+        month: row['month'] as int,
+        year: row['year'] as int,
+      );
+    } catch (e) {
+      final now = DateTime.now();
+      return (month: now.month, year: now.year);
+    }
+  }
+
   Future<int> getUserMonthlyEvaluations(String userId, int month, int year) async {
     try {
       final response = await _client
@@ -78,10 +97,10 @@ class PlanService {
 
       final plan = userPlan.plan;
 
-      // Verificar limite mensal
-      final now = DateTime.now();
-      final currentMonth = now.month;
-      final currentYear = now.year;
+      // Verificar limite mensal (mês de negócio via backend)
+      final current = await getCurrentBusinessMonthYear();
+      final currentMonth = current.month;
+      final currentYear = current.year;
 
       int? monthlyEvaluationsUsed;
       if (!plan.isUnlimitedEvaluations) {

@@ -7,6 +7,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import '../../services/supabase_service.dart';
 import '../../services/photo_of_the_day_service.dart';
 import '../../services/plan_service.dart';
@@ -166,6 +168,46 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
       });
     } catch (e, stackTrace) {
       Logger.error('Erro ao carregar calendário', e, stackTrace);
+    }
+  }
+
+  Future<void> _downloadPhotoWithSelo() async {
+    final urlImagemSelo = _photoOfTheDay?.urlImagemSelo;
+    if (urlImagemSelo == null || urlImagemSelo.trim().isEmpty) return;
+    if (!mounted) return;
+
+    try {
+      final response = await http.get(Uri.parse(urlImagemSelo));
+      if (response.statusCode != 200) {
+        throw Exception('Falha ao baixar imagem: ${response.statusCode}');
+      }
+      final bytes = Uint8List.fromList(response.bodyBytes);
+      final result = await ImageGallerySaverPlus.saveImage(
+        bytes,
+        quality: 100,
+        name: 'foto_do_dia_${DateFormat('yyyyMMdd', 'pt_BR').format(_selectedDate)}',
+      );
+      if (!mounted) return;
+      if (result['isSuccess'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Foto baixada com sucesso!'),
+            backgroundColor: FlutterFlowTheme.of(context).success,
+          ),
+        );
+      } else {
+        throw Exception(result['error'] ?? 'Erro ao salvar na galeria');
+      }
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao baixar foto do dia', e, stackTrace);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao baixar foto: $e'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+      }
     }
   }
 
@@ -435,6 +477,42 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
           ),
 
           const SizedBox(height: 24),
+
+          // Botão de download (apenas se url_imagem_selo estiver preenchido)
+          if (_photoOfTheDay!.urlImagemSelo != null &&
+              _photoOfTheDay!.urlImagemSelo!.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(0, 0, 0, 24),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _downloadPhotoWithSelo,
+                  icon: Icon(
+                    FontAwesomeIcons.download,
+                    size: 20,
+                    color: FlutterFlowTheme.of(context).primary,
+                  ),
+                  label: Text(
+                    'Baixar foto com selo',
+                    style: FlutterFlowTheme.of(context).titleSmall.override(
+                          fontFamily: 'Poppins',
+                          color: FlutterFlowTheme.of(context).primary,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.0,
+                        ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    side: BorderSide(
+                      color: FlutterFlowTheme.of(context).primary,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
           // Author Info
           Row(

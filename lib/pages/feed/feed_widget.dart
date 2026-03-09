@@ -563,6 +563,12 @@ class _FeedWidgetState extends State<FeedWidget> {
     }
   }
 
+  String _truncateUsername(String? name, {int maxLength = 19}) {
+    final displayName = name?.trim() ?? 'Usuário';
+    if (displayName.length <= maxLength) return displayName;
+    return '${displayName.substring(0, maxLength)}...';
+  }
+
   String _getGreeting() {
     final hour = DateTime.now().hour;
     String greeting;
@@ -773,21 +779,17 @@ class _FeedWidgetState extends State<FeedWidget> {
     );
   }
 
-  Future<bool> _isPhotoOfTheDay(String photoId, DateTime photoDate) async {
-    // Usar cache para evitar múltiplas queries
-    final cacheKey = '$photoId-${photoDate.toIso8601String().split('T')[0]}';
-    if (_photoOfDayCache.containsKey(cacheKey)) {
-      return _photoOfDayCache[cacheKey]!;
+  Future<bool> _isPhotoOfTheDay(String photoId) async {
+    if (_photoOfDayCache.containsKey(photoId)) {
+      return _photoOfDayCache[photoId]!;
     }
 
     if (_photoOfTheDayService == null) return false;
 
     try {
-      final isPhotoOfDay = await _photoOfTheDayService!.isPhotoOfTheDay(
-        photoId,
-        photoDate,
-      );
-      _photoOfDayCache[cacheKey] = isPhotoOfDay;
+      final isPhotoOfDay =
+          await _photoOfTheDayService!.isPhotoOfTheDayByPhotoId(photoId);
+      _photoOfDayCache[photoId] = isPhotoOfDay;
       return isPhotoOfDay;
     } catch (e) {
       Logger.debug('Erro ao verificar se foto é do dia: $e');
@@ -853,7 +855,7 @@ class _FeedWidgetState extends State<FeedWidget> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          photo.username ?? 'Usuário',
+                          _truncateUsername(photo.username),
                           style: FlutterFlowTheme.of(context).titleSmall.override(
                                 font: GoogleFonts.poppins(),
                                 fontSize: 14.0,
@@ -1531,6 +1533,12 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
     }
   }
 
+  String _truncateUsername(String? name, {int maxLength = 19}) {
+    final displayName = name?.trim() ?? 'Usuário';
+    if (displayName.length <= maxLength) return displayName;
+    return '${displayName.substring(0, maxLength)}...';
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
@@ -1663,7 +1671,7 @@ class _CommentsBottomSheetState extends State<_CommentsBottomSheet> {
                                           children: [
                                             Expanded(
                                               child: Text(
-                                                comment.username ?? 'Usuário',
+                                                _truncateUsername(comment.username),
                                                 style: FlutterFlowTheme.of(context)
                                                     .bodyMedium
                                                     .override(

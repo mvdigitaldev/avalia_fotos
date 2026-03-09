@@ -26,11 +26,9 @@ class DashboardService {
 
   Future<DashboardStatsModel> getUserDashboardStats(String userId) async {
     try {
-      final now = DateTime.now();
-      final currentMonth = now.month;
-      final currentYear = now.year;
-      final startOfMonth = DateTime(currentYear, currentMonth, 1);
-      final endOfMonth = DateTime(currentYear, currentMonth + 1, 0, 23, 59, 59);
+      final current = await _planService.getCurrentBusinessMonthYear();
+      final currentMonth = current.month;
+      final currentYear = current.year;
 
       // Buscar pontuação mensal do usuário
       final monthlyScoreData = await _client
@@ -59,13 +57,26 @@ class DashboardService {
       final userPlan = await _planService.getUserPlan(userId);
       final monthlyLimit = userPlan?.plan?.monthlyEvaluationsLimit;
 
-      // Calcular média das notas do mês
-      final photosResponse = await _client
-          .from('photos')
-          .select('score')
-          .eq('user_id', userId)
-          .gte('created_at', startOfMonth.toIso8601String())
-          .lte('created_at', endOfMonth.toIso8601String());
+      // Calcular média das notas do mês (faixa UTC de negócio via RPC)
+      final bounds = await _client.rpc('business_month_bounds_utc', params: {
+        'p_year': currentYear,
+        'p_month': currentMonth,
+      });
+      final startUtc = bounds != null && bounds is List && bounds.isNotEmpty
+          ? (bounds as List).first['start_utc'] as String?
+          : null;
+      final endUtc = bounds != null && bounds is List && bounds.isNotEmpty
+          ? (bounds as List).first['end_utc'] as String?
+          : null;
+
+      final photosResponse = startUtc != null && endUtc != null
+          ? await _client
+              .from('photos')
+              .select('score')
+              .eq('user_id', userId)
+              .gte('created_at', startUtc)
+              .lt('created_at', endUtc)
+          : <dynamic>[];
 
       double? monthlyAverageScore;
       if (photosResponse.isNotEmpty) {
@@ -82,22 +93,27 @@ class DashboardService {
         }
       }
 
-      // Buscar melhor foto do mês
-      final bestPhotoResponse = await _client
-          .from('photos')
-          .select('''
-            *,
-            users:user_id (
-              username,
-              avatar_url
-            )
-          ''')
-          .eq('user_id', userId)
-          .gte('created_at', startOfMonth.toIso8601String())
-          .lte('created_at', endOfMonth.toIso8601String())
-          .order('score', ascending: false)
-          .limit(1)
-          .maybeSingle();
+      // Buscar melhor foto do mês (faixa UTC de negócio)
+      dynamic bestPhotoResponse;
+      if (startUtc != null && endUtc != null) {
+        final photos = await _client
+            .from('photos')
+            .select('''
+              *,
+              users:user_id (
+                username,
+                avatar_url
+              )
+            ''')
+            .eq('user_id', userId)
+            .gte('created_at', startUtc)
+            .lt('created_at', endUtc)
+            .order('score', ascending: false)
+            .limit(1);
+        bestPhotoResponse = (photos as List).isNotEmpty ? photos.first : null;
+      } else {
+        bestPhotoResponse = null;
+      }
 
       PhotoModel? bestPhotoOfMonth;
       if (bestPhotoResponse != null) {

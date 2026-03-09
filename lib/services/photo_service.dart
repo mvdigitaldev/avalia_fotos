@@ -170,13 +170,13 @@ class PhotoService {
     int limit = 20,
     int offset = 0,
     bool? isShared,
+    bool skipBlockCheck = false,
   }) async {
     try {
-      // Verificar se o usuário está bloqueado
-      if (_blockService != null && currentUserId != null) {
+      // Verificar se o usuário está bloqueado (exceto para admin)
+      if (!skipBlockCheck && _blockService != null && currentUserId != null) {
         final isBlocked = await _blockService!.isUserBlocked(userId);
         if (isBlocked) {
-          // Retornar lista vazia se o usuário estiver bloqueado
           return <PhotoModel>[];
         }
       }
@@ -458,6 +458,53 @@ class PhotoService {
       }
 
       // Deletar do banco de dados apenas as que foram deletadas do Storage
+      if (deletedPhotoIds.isNotEmpty) {
+        await _client.from('photos').delete().inFilter('id', deletedPhotoIds);
+      }
+
+      return deletedPhotoIds;
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Exclui fotos por IDs (apenas para admin). Não verifica user_id.
+  Future<List<String>> deletePhotosAsAdmin(List<String> photoIds) async {
+    try {
+      if (currentUserId == null) {
+        throw Exception('Usuário não autenticado');
+      }
+      if (photoIds.isEmpty) return [];
+
+      final photosResponse = await _client
+          .from('photos')
+          .select('id, image_url')
+          .inFilter('id', photoIds);
+
+      final imageUrls = <String>[];
+      final validPhotoIds = <String>[];
+
+      for (final photo in photosResponse) {
+        final photoId = photo['id'] as String;
+        final imageUrl = photo['image_url'] as String?;
+        if (imageUrl != null && imageUrl.isNotEmpty) {
+          imageUrls.add(imageUrl);
+          validPhotoIds.add(photoId);
+        }
+      }
+
+      if (validPhotoIds.isEmpty) return [];
+
+      final storageService = StorageService(_supabaseService);
+      final deletedUrls = await storageService.deleteMultiplePhotos(imageUrls);
+
+      final deletedPhotoIds = <String>[];
+      for (int i = 0; i < imageUrls.length; i++) {
+        if (deletedUrls.contains(imageUrls[i])) {
+          deletedPhotoIds.add(validPhotoIds[i]);
+        }
+      }
+
       if (deletedPhotoIds.isNotEmpty) {
         await _client.from('photos').delete().inFilter('id', deletedPhotoIds);
       }

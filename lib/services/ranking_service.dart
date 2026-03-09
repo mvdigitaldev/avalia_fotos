@@ -11,15 +11,30 @@ class RankingService {
 
   SupabaseClient get _client => _supabaseService.client;
 
+  Future<({int month, int year})> _getCurrentBusinessMonthYear() async {
+    try {
+      final r = await _client.rpc('get_current_business_month_year');
+      if (r == null || r is! List || r.isEmpty) {
+        final now = DateTime.now();
+        return (month: now.month, year: now.year);
+      }
+      final row = r.first as Map<String, dynamic>;
+      return (month: row['month'] as int, year: row['year'] as int);
+    } catch (_) {
+      final now = DateTime.now();
+      return (month: now.month, year: now.year);
+    }
+  }
+
   Future<List<RankingItemModel>> getTopUsersOfMonth({
     int limit = 10,
   }) async {
-    final now = DateTime.now();
+    final current = await _getCurrentBusinessMonthYear();
     return getTopUsersOfMonthPaginated(
       limit: limit,
       offset: 0,
-      month: now.month,
-      year: now.year,
+      month: current.month,
+      year: current.year,
     );
   }
 
@@ -157,12 +172,12 @@ class RankingService {
   Future<List<PhotoModel>> getBestPhotosOfMonth({
     int limit = 10,
   }) async {
-    final now = DateTime.now();
+    final current = await _getCurrentBusinessMonthYear();
     return getBestPhotosOfMonthPaginated(
       limit: limit,
       offset: 0,
-      month: now.month,
-      year: now.year,
+      month: current.month,
+      year: current.year,
     );
   }
 
@@ -173,31 +188,23 @@ class RankingService {
     required int year,
   }) async {
     try {
-      final startOfMonth = DateTime(year, month, 1);
-      final endOfMonth = DateTime(year, month + 1, 0, 23, 59, 59);
+      final response = await _client.rpc(
+        'get_best_photos_of_month',
+        params: {
+          'p_year': year,
+          'p_month': month,
+          'p_limit': limit,
+          'p_offset': offset,
+        },
+      );
 
-      final response = await _client
-          .from('photos')
-          .select('''
-            *,
-            users:user_id (
-              username,
-              avatar_url
-            )
-          ''')
-          .eq('is_shared', true)
-          .gte('created_at', startOfMonth.toIso8601String())
-          .lte('created_at', endOfMonth.toIso8601String())
-          .order('score', ascending: false)
-          .range(offset, offset + limit - 1);
+      if (response == null || response is! List) return [];
 
       final photos = <PhotoModel>[];
       for (final item in response) {
-        final userData = item['users'] as Map<String, dynamic>?;
-        photos.add(PhotoModel.fromJson(item).copyWith(
-          username: userData?['username'] as String?,
-          userAvatarUrl: userData?['avatar_url'] as String?,
-        ));
+        if (item is Map<String, dynamic>) {
+          photos.add(PhotoModel.fromJson(item));
+        }
       }
       return photos;
     } catch (e) {
@@ -210,17 +217,11 @@ class RankingService {
     required int year,
   }) async {
     try {
-      final startOfMonth = DateTime(year, month, 1);
-      final endOfMonth = DateTime(year, month + 1, 0, 23, 59, 59);
-
-      final response = await _client
-          .from('photos')
-          .select('id')
-          .eq('is_shared', true)
-          .gte('created_at', startOfMonth.toIso8601String())
-          .lte('created_at', endOfMonth.toIso8601String());
-
-      return (response as List).length;
+      final response = await _client.rpc(
+        'count_shared_photos_in_month_br',
+        params: {'p_year': year, 'p_month': month},
+      );
+      return response is int ? response : (response as num?)?.toInt() ?? 0;
     } catch (e) {
       throw _handleError(e);
     }
@@ -228,9 +229,9 @@ class RankingService {
 
   Future<int?> getUserRankingPosition(String userId) async {
     try {
-      final now = DateTime.now();
-      final currentMonth = now.month;
-      final currentYear = now.year;
+      final current = await _getCurrentBusinessMonthYear();
+      final currentMonth = current.month;
+      final currentYear = current.year;
 
       // Buscar score do usuário
       final userScore = await _client

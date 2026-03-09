@@ -282,12 +282,18 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                     ),
               ),
             ),
-            Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 8.0),
-              child: InkWell(
-                onTap: () {
-                  Navigator.of(context).pop(); // Fechar drawer
-                  context.push('/perfil');
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.only(bottom: 8.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 8.0),
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.of(context).pop(); // Fechar drawer
+                          context.push('/perfil');
                 },
                 child: Container(
                   decoration: BoxDecoration(
@@ -1142,12 +1148,11 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                 ),
               ),
             ),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.max,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (isLoadingPlan)
+                  ],
+                ),
+              ),
+            ),
+            if (isLoadingPlan)
                     Padding(
                       padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 8.0),
                       child: Container(
@@ -1296,9 +1301,6 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                         ),
                       ),
                     ),
-                ],
-              ),
-            ),
           ],
         ),
       ),

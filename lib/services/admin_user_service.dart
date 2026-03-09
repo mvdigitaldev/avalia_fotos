@@ -10,11 +10,30 @@ class AdminUserService {
 
   SupabaseClient get _client => _supabaseService.client;
 
-  Future<List<Map<String, dynamic>>> searchUserByEmail(String email) async {
+  /// Busca um usuário por ID (apenas admins)
+  Future<Map<String, dynamic>?> getUserById(String userId) async {
     try {
+      final response = await _client
+          .from('users')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
+      return response as Map<String, dynamic>?;
+    } catch (e) {
+      Logger.error('Erro ao buscar usuário', e, StackTrace.current);
+      rethrow;
+    }
+  }
+
+  /// Busca usuários por username ou email. Mínimo 4 caracteres.
+  Future<List<Map<String, dynamic>>> searchUsers(String query) async {
+    try {
+      final trimmed = query.trim();
+      if (trimmed.length < 4) return [];
+
       final response = await _client.rpc(
-        'admin_search_user_by_email',
-        params: {'p_email': email.trim()},
+        'admin_search_users',
+        params: {'p_query': trimmed},
       );
       if (response == null) return [];
       if (response is! List) return [];
@@ -22,7 +41,7 @@ class AdminUserService {
         response.map((e) => e is Map<String, dynamic> ? e : Map<String, dynamic>.from(e as Map)),
       );
     } catch (e) {
-      Logger.error('Erro ao buscar usuário por email', e, StackTrace.current);
+      Logger.error('Erro ao buscar usuários', e, StackTrace.current);
       rethrow;
     }
   }

@@ -27,6 +27,27 @@ class PhotoOfTheDayService {
       }
 
       final data = (response as List).first as Map<String, dynamic>;
+
+      // Fallback: se o RPC não retornar url_imagem_selo, buscar diretamente da tabela
+      final urlSelo = data['url_imagem_selo'] as String?;
+      if (urlSelo == null || urlSelo.trim().isEmpty) {
+        try {
+          final row = await _client
+              .from('photo_of_the_day')
+              .select('url_imagem_selo')
+              .eq('selected_date', dateStr)
+              .maybeSingle();
+          if (row != null && row['url_imagem_selo'] != null) {
+            final fetched = row['url_imagem_selo'] as String?;
+            if (fetched != null && fetched.trim().isNotEmpty) {
+              data['url_imagem_selo'] = fetched;
+            }
+          }
+        } catch (e) {
+          Logger.debug('Fallback url_imagem_selo: $e');
+        }
+      }
+
       return PhotoOfTheDayModel.fromJson(data);
     } catch (e, stackTrace) {
       Logger.error('Erro ao buscar foto do dia', e, stackTrace);
@@ -156,6 +177,20 @@ class PhotoOfTheDayService {
       return photoOfDay?.photoId == photoId;
     } catch (e, stackTrace) {
       Logger.error('Erro ao verificar se foto é do dia', e, stackTrace);
+      return false;
+    }
+  }
+
+  /// Verifica se uma foto é a foto do dia pelo ID (usa data de negócio no backend)
+  Future<bool> isPhotoOfTheDayByPhotoId(String photoId) async {
+    try {
+      final response = await _client.rpc(
+        'is_photo_of_the_day_by_photo_id',
+        params: {'p_photo_id': photoId},
+      );
+      return response == true;
+    } catch (e, stackTrace) {
+      Logger.error('Erro ao verificar se foto é do dia por ID', e, stackTrace);
       return false;
     }
   }

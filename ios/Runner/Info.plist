@@ -75,5 +75,9 @@
 	<true/>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-3940256099942544~1458002511</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>O app precisa de permissão para salvar a foto do dia na sua galeria.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>O app precisa de permissão para acessar sua galeria de fotos.</string>
 </dict>
 </plist>

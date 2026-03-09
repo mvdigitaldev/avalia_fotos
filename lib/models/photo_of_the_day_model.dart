@@ -5,6 +5,7 @@ class PhotoOfTheDayModel {
   final String selectedBy;
   final DateTime createdAt;
   final PhotoData? photoData;
+  final String? urlImagemSelo;
 
   PhotoOfTheDayModel({
     required this.id,
@@ -13,6 +14,7 @@ class PhotoOfTheDayModel {
     required this.selectedBy,
     required this.createdAt,
     this.photoData,
+    this.urlImagemSelo,
   });
 
   factory PhotoOfTheDayModel.fromJson(Map<String, dynamic> json) {
@@ -41,6 +43,7 @@ class PhotoOfTheDayModel {
       photoData: photoDataMap != null
           ? PhotoData.fromJson(photoDataMap)
           : null,
+      urlImagemSelo: json['url_imagem_selo'] as String?,
     );
   }
 
@@ -52,6 +55,7 @@ class PhotoOfTheDayModel {
       'selected_by': selectedBy,
       'created_at': createdAt.toIso8601String(),
       'photo_data': photoData?.toJson(),
+      'url_imagem_selo': urlImagemSelo,
     };
   }
 }

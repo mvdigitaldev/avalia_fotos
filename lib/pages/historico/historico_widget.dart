@@ -363,7 +363,7 @@ class _HistoricoWidgetState extends State<HistoricoWidget> {
           ),
           // Badge de troféu se for foto do dia
           FutureBuilder<bool>(
-            future: _isPhotoOfTheDay(photo.id, photo.createdAt),
+            future: _isPhotoOfTheDay(photo.id),
             builder: (context, snapshot) {
               if (snapshot.data == true && !_model.isSelectionMode) {
                 return Positioned(
@@ -401,20 +401,17 @@ class _HistoricoWidgetState extends State<HistoricoWidget> {
     );
   }
 
-  Future<bool> _isPhotoOfTheDay(String photoId, DateTime photoDate) async {
-    final cacheKey = '$photoId-${photoDate.toIso8601String().split('T')[0]}';
-    if (_photoOfDayCache.containsKey(cacheKey)) {
-      return _photoOfDayCache[cacheKey]!;
+  Future<bool> _isPhotoOfTheDay(String photoId) async {
+    if (_photoOfDayCache.containsKey(photoId)) {
+      return _photoOfDayCache[photoId]!;
     }
 
     if (_photoOfTheDayService == null) return false;
 
     try {
-      final isPhotoOfDay = await _photoOfTheDayService!.isPhotoOfTheDay(
-        photoId,
-        photoDate,
-      );
-      _photoOfDayCache[cacheKey] = isPhotoOfDay;
+      final isPhotoOfDay =
+          await _photoOfTheDayService!.isPhotoOfTheDayByPhotoId(photoId);
+      _photoOfDayCache[photoId] = isPhotoOfDay;
       return isPhotoOfDay;
     } catch (e) {
       Logger.debug('Erro ao verificar se foto é do dia: $e');

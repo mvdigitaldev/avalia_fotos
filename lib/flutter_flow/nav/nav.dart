@@ -52,6 +52,9 @@ import '/pages/admin/select_photo_of_day_widget.dart';
 import '/pages/admin/send_push_notification_widget.dart';
 // Import AdminManageUsersWidget explicitly
 import '/pages/admin/admin_manage_users_widget.dart';
+// Import AdminEditUserWidget and AdminUserPhotosWidget
+import '/pages/admin/admin_edit_user_widget.dart';
+import '/pages/admin/admin_user_photos_widget.dart';
 // Import ResetPasswordWidget explicitly
 import '/pages/reset_password/reset_password_widget.dart';
 // Import UserProfileWidget explicitly
@@ -331,6 +334,18 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) {
         path: AdminManageUsersWidget.routePath,
         requireAuth: true,
         builder: (context, params) => AdminManageUsersWidget(),
+      ),
+      FFRoute(
+        name: AdminEditUserWidget.routeName,
+        path: AdminEditUserWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => AdminEditUserWidget(),
+      ),
+      FFRoute(
+        name: AdminUserPhotosWidget.routeName,
+        path: AdminUserPhotosWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => AdminUserPhotosWidget(),
       ),
         FFRoute(
           name: LoginWidget.routeName,

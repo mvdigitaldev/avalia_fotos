@@ -114,12 +114,10 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
 
       final commentModels = comments.map((c) => CommentModel.fromJson(c)).toList();
 
-      // Verificar se é foto do dia
+      // Verificar se é foto do dia (backend usa data de negócio)
       if (_photoOfTheDayService != null) {
-        final isPhotoOfDay = await _photoOfTheDayService!.isPhotoOfTheDay(
-          photo.id,
-          photo.createdAt,
-        );
+        final isPhotoOfDay =
+            await _photoOfTheDayService!.isPhotoOfTheDayByPhotoId(photo.id);
         setState(() {
           _isPhotoOfDay = isPhotoOfDay;
         });

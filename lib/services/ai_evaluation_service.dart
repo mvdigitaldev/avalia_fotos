@@ -72,8 +72,16 @@ class AIEvaluationService {
       // Incrementar contador de avaliações mensais após sucesso
       await _planService.incrementMonthlyEvaluation(currentUserId!);
       
-      // Atualizar pontuação mensal do usuário
-      await _updateMonthlyScore(photo.score);
+      // Atualizar pontuação mensal via RPC (backend usa data de negócio)
+      try {
+        final scoreToAdd = (photo.score / 2) + 2;
+        await _client.rpc('increment_monthly_score', params: {
+          'p_user_id': currentUserId!,
+          'p_score_to_add': scoreToAdd,
+        });
+      } catch (e, stackTrace) {
+        Logger.error('Erro ao atualizar pontuação mensal', e, stackTrace);
+      }
       
       // Nota: A verificação de conquistas será feita na UI após a avaliação
       // para permitir que o modal seja exibido corretamente
@@ -88,54 +96,5 @@ class AIEvaluationService {
     }
   }
 
-  Future<void> _updateMonthlyScore(double photoScore) async {
-    try {
-      if (currentUserId == null) return;
-
-      // Calcular pontuação a adicionar: (score/2) + 2
-      final scoreToAdd = (photoScore / 2) + 2;
-
-      // Obter mês e ano atual como inteiros
-      final now = DateTime.now();
-      final month = now.month;
-      final year = now.year;
-
-      // Verificar se já existe registro para este mês/ano
-      final existing = await _client
-          .from('user_monthly_scores')
-          .select('id, score, photos_count')
-          .eq('user_id', currentUserId!)
-          .eq('month', month)
-          .eq('year', year)
-          .maybeSingle();
-
-      if (existing != null) {
-        // Atualizar pontuação existente e incrementar contador de fotos
-        final currentScore = (existing['score'] as num).toDouble();
-        final currentPhotosCount = (existing['photos_count'] as num?)?.toInt() ?? 0;
-        
-        await _client
-            .from('user_monthly_scores')
-            .update({
-              'score': currentScore + scoreToAdd,
-              'photos_count': currentPhotosCount + 1,
-            })
-            .eq('id', existing['id']);
-      } else {
-        // Criar novo registro para o mês/ano atual
-        // Quando o mês muda, um novo registro é criado automaticamente (score começa do zero)
-        await _client.from('user_monthly_scores').insert({
-          'user_id': currentUserId!,
-          'month': month,
-          'year': year,
-          'score': scoreToAdd,
-          'photos_count': 1,
-        });
-      }
-    } catch (e, stackTrace) {
-      // Não falhar a avaliação se houver erro ao atualizar score
-      Logger.error('Erro ao atualizar pontuação mensal', e, stackTrace);
-    }
-  }
 }
 
