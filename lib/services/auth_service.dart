@@ -341,12 +341,12 @@ class AuthService {
         throw Exception('Por favor, insira um email válido');
       }
 
-      // Configurar redirectTo para deep link do app
-      // Para mobile: avaliafotos://avaliafotos.com/reset-password
-      // Para web: usar URL do site configurada no Supabase
-      final redirectTo = kIsWeb 
+      // URL web universal: funciona em desktop e mobile (igual ao Editaiapp)
+      // Mobile abre o site no navegador em avaliafotos.com.br/reset-password
+      // IMPORTANTE: Deve coincidir com a URL canônica do site (www ou não)
+      final redirectTo = kIsWeb
           ? '${Uri.base.origin}/reset-password'
-          : 'avaliafotos://avaliafotos.com/reset-password';
+          : 'https://avaliafotos.com.br/reset-password';
 
       await _client.auth.resetPasswordForEmail(
         email,

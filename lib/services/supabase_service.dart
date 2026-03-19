@@ -23,9 +23,15 @@ class SupabaseService {
 
       Logger.debug('Inicializando Supabase com URL: ${config['url']}');
 
+      // Usar fluxo implícito: o reset de senha redireciona para o site web no navegador.
+      // No PKCE, o code verifier fica no app, mas o link abre no browser - sem acesso ao verifier.
+      // Com implicit, os tokens vêm no hash (#access_token=...) e o site web consegue usar setSession.
       await Supabase.initialize(
         url: config['url']!,
         anonKey: config['anonKey']!,
+        authOptions: FlutterAuthClientOptions(
+          authFlowType: AuthFlowType.implicit,
+        ),
       );
 
       _client = Supabase.instance.client;
