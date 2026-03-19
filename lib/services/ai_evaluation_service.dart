@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../utils/logger.dart';
 import 'supabase_service.dart';
 import '../models/evaluation_result_model.dart';
 import '../models/photo_model.dart';
@@ -65,23 +64,9 @@ class AIEvaluationService {
       // Processar resultado da avaliação
       final responseData = response.data as Map<String, dynamic>;
       
-      // A Edge Function já salva a foto no banco e retorna o objeto photo completo
+      // A Edge Function já salva a foto e atualiza user_monthly_scores e user_monthly_evaluations
       final photoData = responseData['photo'] as Map<String, dynamic>;
       final photo = PhotoModel.fromJson(photoData);
-      
-      // Incrementar contador de avaliações mensais após sucesso
-      await _planService.incrementMonthlyEvaluation(currentUserId!);
-      
-      // Atualizar pontuação mensal via RPC (backend usa data de negócio)
-      try {
-        final scoreToAdd = (photo.score / 2) + 2;
-        await _client.rpc('increment_monthly_score', params: {
-          'p_user_id': currentUserId!,
-          'p_score_to_add': scoreToAdd,
-        });
-      } catch (e, stackTrace) {
-        Logger.error('Erro ao atualizar pontuação mensal', e, stackTrace);
-      }
       
       // Nota: A verificação de conquistas será feita na UI após a avaliação
       // para permitir que o modal seja exibido corretamente

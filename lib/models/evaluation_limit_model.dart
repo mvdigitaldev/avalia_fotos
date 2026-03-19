@@ -6,6 +6,7 @@ class EvaluationLimitModel {
   final int? monthlyEvaluationsLimit;
   final int storageUsed;
   final int? storageLimit;
+  final int extraEvaluationsCount;
 
   EvaluationLimitModel({
     required this.canEvaluate,
@@ -14,7 +15,10 @@ class EvaluationLimitModel {
     this.monthlyEvaluationsLimit,
     required this.storageUsed,
     this.storageLimit,
+    this.extraEvaluationsCount = 0,
   });
+
+  bool get hasExtraEvaluations => extraEvaluationsCount > 0;
 
   bool get isMonthlyLimitReached {
     if (monthlyEvaluationsLimit == null) return false;

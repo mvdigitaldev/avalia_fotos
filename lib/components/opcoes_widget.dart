@@ -843,6 +843,7 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
               padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 8.0),
               child: InkWell(
                 onTap: () {
+                  Navigator.of(context).pop();
                   context.push('/conquistas');
                 },
                 child: Container(
@@ -901,6 +902,55 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                 ),
               ),
             ),
+            // Item Avaliações Extras (apenas quando habilitar_planos = false)
+            if (!habilitarPlanos)
+              Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 8.0),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    context.push('/evaluation-packs-shop');
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Color(0x11868686),
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 8.0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.max,
+                        children: [
+                          _buildOptionIcon(
+                            Icon(
+                              Icons.add_photo_alternate,
+                              color: FlutterFlowTheme.of(context).primary,
+                              size: 24.0,
+                            ),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 0.0, 0.0),
+                              child: Text(
+                                'Avaliações Extras',
+                                style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                      font: GoogleFonts.poppins(),
+                                      letterSpacing: 0.0,
+                                    ),
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.arrow_right_sharp,
+                            color: FlutterFlowTheme.of(context).primary,
+                            size: 24.0,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             // Item Premiações (visível para todos os usuários)
             Padding(
               padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 8.0),

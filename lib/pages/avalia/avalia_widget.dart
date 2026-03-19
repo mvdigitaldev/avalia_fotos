@@ -113,16 +113,19 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
       final supabaseService = await SupabaseService.getInstance();
       final photoService = PhotoService(supabaseService);
       final storageCount = await photoService.getUserStorageCount();
-      
+
       final limitCheck = await _planService.canEvaluatePhoto(userId);
+      final habilitarPlanos = await _planService.getHabilitarPlanos();
+
       safeSetState(() {
         _model.canEvaluate = limitCheck.canEvaluate;
         _model.limitMessage = limitCheck.reason;
         _model.monthlyEvaluationsUsed = limitCheck.monthlyEvaluationsUsed;
         _model.monthlyEvaluationsLimit = limitCheck.monthlyEvaluationsLimit;
-        // Usar o valor atualizado diretamente do contador
         _model.storageUsed = storageCount;
         _model.storageLimit = limitCheck.storageLimit;
+        _model.extraEvaluationsCount = limitCheck.extraEvaluationsCount;
+        _model.habilitarPlanos = habilitarPlanos;
       });
     } catch (e, stackTrace) {
       Logger.error('Erro ao verificar limites', e, stackTrace);
@@ -1132,33 +1135,79 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
                                           ),
                                         Padding(
                                           padding: EdgeInsetsDirectional.fromSTEB(0, 12, 0, 0),
-                                          child: FFButtonWidget(
-                                            onPressed: () => PlansNavigationHelper.navigateToPlans(context),
-                                            text: 'Fazer Upgrade',
-                                            options: FFButtonOptions(
-                                              width: double.infinity,
-                                              height: 40,
-                                              padding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 0),
-                                              iconPadding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 0),
-                                              color: FlutterFlowTheme.of(context).primary,
-                                              textStyle: FlutterFlowTheme.of(context).titleSmall.override(
-                                                    font: GoogleFonts.poppins(
-                                                      fontWeight: FontWeight.w600,
-                                                    ),
-                                                    color: Colors.white,
-                                                    letterSpacing: 0.0,
+                                          child: _model.habilitarPlanos
+                                              ? FFButtonWidget(
+                                                  onPressed: () => PlansNavigationHelper.navigateToPlans(context),
+                                                  text: 'Fazer Upgrade',
+                                                  options: FFButtonOptions(
+                                                    width: double.infinity,
+                                                    height: 40,
+                                                    padding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 0),
+                                                    iconPadding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 0),
+                                                    color: FlutterFlowTheme.of(context).primary,
+                                                    textStyle: FlutterFlowTheme.of(context).titleSmall.override(
+                                                          font: GoogleFonts.poppins(
+                                                            fontWeight: FontWeight.w600,
+                                                          ),
+                                                          color: Colors.white,
+                                                          letterSpacing: 0.0,
+                                                        ),
+                                                    elevation: 0,
+                                                    borderRadius: BorderRadius.circular(8),
                                                   ),
-                                              elevation: 0,
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                          ),
+                                                )
+                                              : Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: FFButtonWidget(
+                                                        onPressed: () => context.push('/evaluation-packs-shop'),
+                                                        text: 'Comprar Extras',
+                                                        options: FFButtonOptions(
+                                                          height: 40,
+                                                          padding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 0),
+                                                          color: FlutterFlowTheme.of(context).primary,
+                                                          textStyle: FlutterFlowTheme.of(context).titleSmall.override(
+                                                                font: GoogleFonts.poppins(
+                                                                  fontWeight: FontWeight.w600,
+                                                                ),
+                                                                color: Colors.white,
+                                                                letterSpacing: 0.0,
+                                                              ),
+                                                          elevation: 0,
+                                                          borderRadius: BorderRadius.circular(8),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Expanded(
+                                                      child: FFButtonWidget(
+                                                        onPressed: () => PlansNavigationHelper.navigateToPlans(context),
+                                                        text: 'Migrar Plano',
+                                                        options: FFButtonOptions(
+                                                          height: 40,
+                                                          padding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 0),
+                                                          color: FlutterFlowTheme.of(context).secondary,
+                                                          textStyle: FlutterFlowTheme.of(context).titleSmall.override(
+                                                                font: GoogleFonts.poppins(
+                                                                  fontWeight: FontWeight.w600,
+                                                                ),
+                                                                color: Colors.white,
+                                                                letterSpacing: 0.0,
+                                                              ),
+                                                          elevation: 0,
+                                                          borderRadius: BorderRadius.circular(8),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
                                         ),
                                       ],
                                     ),
                                   ),
                                 ),
                               // Progresso de uso quando pode avaliar
-                              if (_model.canEvaluate && (_model.monthlyEvaluationsLimit != null || _model.storageLimit != null))
+                              if (_model.canEvaluate && (_model.monthlyEvaluationsLimit != null || _model.storageLimit != null || _model.extraEvaluationsCount > 0))
                                 Padding(
                                   padding: EdgeInsetsDirectional.fromSTEB(
                                       0.0, 16.0, 0.0, 0.0),
@@ -1176,6 +1225,31 @@ class _AvaliaWidgetState extends State<AvaliaWidget> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
+                                        if (_model.extraEvaluationsCount > 0)
+                                          Padding(
+                                            padding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 8),
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Text(
+                                                  'Avaliações extras',
+                                                  style: FlutterFlowTheme.of(context).bodySmall.override(
+                                                        font: GoogleFonts.poppins(),
+                                                        letterSpacing: 0.0,
+                                                      ),
+                                                ),
+                                                Text(
+                                                  '${_model.extraEvaluationsCount}',
+                                                  style: FlutterFlowTheme.of(context).bodySmall.override(
+                                                        font: GoogleFonts.poppins(
+                                                          fontWeight: FontWeight.w600,
+                                                        ),
+                                                        letterSpacing: 0.0,
+                                                      ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
                                         if (_model.monthlyEvaluationsLimit != null)
                                           Padding(
                                             padding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, 8),

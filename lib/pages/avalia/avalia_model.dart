@@ -29,6 +29,8 @@ class AvaliaModel extends FlutterFlowModel<AvaliaWidget> {
   int? monthlyEvaluationsLimit;
   int storageUsed = 0;
   int? storageLimit;
+  int extraEvaluationsCount = 0;
+  bool habilitarPlanos = false;
 
   @override
   void initState(BuildContext context) {

@@ -61,6 +61,8 @@ import '/pages/reset_password/reset_password_widget.dart';
 import '/pages/user_profile/user_profile_widget.dart';
 // Import CheckoutWebViewWidget explicitly
 import '/pages/checkout_webview/checkout_webview_widget.dart';
+// Import EvaluationPacksShopWidget explicitly
+import '/pages/evaluation_packs_shop/evaluation_packs_shop_widget.dart';
 
 export 'package:go_router/go_router.dart';
 export 'serialization_util.dart';
@@ -388,6 +390,12 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) {
         path: PlansAsaasWidget.routePath,
         requireAuth: true,
         builder: (context, params) => PlansAsaasWidget(),
+      ),
+      FFRoute(
+        name: EvaluationPacksShopWidget.routeName,
+        path: EvaluationPacksShopWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => EvaluationPacksShopWidget(),
       ),
       FFRoute(
         name: CheckoutWebViewWidget.routeName,

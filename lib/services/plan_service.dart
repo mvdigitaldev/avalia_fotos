@@ -85,7 +85,38 @@ class PlanService {
 
   Future<EvaluationLimitModel> canEvaluatePhoto(String userId) async {
     try {
-      // Buscar plano do usuário
+      // Primeiro verificar se tem avaliações extras (prioridade)
+      final extraCount = await _getUserExtraCount(userId);
+      if (extraCount > 0) {
+        // Tem extras: verificar apenas armazenamento
+        final storageUsed = await _photoService.getUserStorageCount();
+        final userPlan = await getUserPlan(userId);
+        final plan = userPlan?.plan;
+        final storageLimit = plan?.storageLimit;
+
+        if (plan != null && !plan.isUnlimitedStorage && storageUsed >= (storageLimit ?? 0)) {
+          return EvaluationLimitModel(
+            canEvaluate: false,
+            reason: 'Limite de armazenamento atingido',
+            monthlyEvaluationsUsed: 0,
+            monthlyEvaluationsLimit: plan.monthlyEvaluationsLimit,
+            storageUsed: storageUsed,
+            storageLimit: storageLimit,
+            extraEvaluationsCount: extraCount,
+          );
+        }
+
+        return EvaluationLimitModel(
+          canEvaluate: true,
+          monthlyEvaluationsUsed: 0,
+          monthlyEvaluationsLimit: plan?.monthlyEvaluationsLimit,
+          storageUsed: storageUsed,
+          storageLimit: storageLimit,
+          extraEvaluationsCount: extraCount,
+        );
+      }
+
+      // Sem extras: usar lógica do plano mensal
       final userPlan = await getUserPlan(userId);
       if (userPlan == null) {
         return EvaluationLimitModel(
@@ -124,8 +155,7 @@ class PlanService {
 
       // Verificar limite de armazenamento
       int storageUsed = await _photoService.getUserStorageCount();
-      
-      // Garantir que storageUsed seja sempre atualizado
+
       if (!plan.isUnlimitedStorage) {
         if (storageUsed >= plan.storageLimit!) {
           return EvaluationLimitModel(
@@ -148,6 +178,33 @@ class PlanService {
       );
     } catch (e) {
       throw _handleError(e);
+    }
+  }
+
+  Future<int> _getUserExtraCount(String userId) async {
+    try {
+      final result = await _client.rpc(
+        'get_user_extra_count',
+        params: {'p_user_id': userId},
+      );
+      if (result == null) return 0;
+      return (result as num).toInt();
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  /// Retorna habilitar_planos da system_configuration
+  Future<bool> getHabilitarPlanos() async {
+    try {
+      final response = await _client
+          .from('system_configuration')
+          .select('habilitar_planos')
+          .limit(1)
+          .maybeSingle();
+      return response?['habilitar_planos'] as bool? ?? false;
+    } catch (e) {
+      return false;
     }
   }
 
