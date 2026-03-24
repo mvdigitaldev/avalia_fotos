@@ -54,6 +54,8 @@ class PhotoService {
             updated_at,
             categoria,
             is_photo_of_the_day,
+            is_photo_of_the_week,
+            is_photo_of_the_month,
             users:user_id (
               username,
               avatar_url

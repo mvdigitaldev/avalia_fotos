@@ -15,7 +15,7 @@ import '../../utils/logger.dart';
 import '../../models/photo_model.dart';
 import '../../components/banner_ad_widget.dart';
 import '../../components/photo_trophy_badge.dart';
-import '../../services/photo_of_the_day_service.dart';
+import '../../services/photo_awards_service.dart';
 import '../../services/plan_service.dart';
 import '../../services/upgrade_prompt_service.dart';
 import '../../components/upgrade_banner.dart';
@@ -40,9 +40,9 @@ class _HistoricoWidgetState extends State<HistoricoWidget> {
   PlanService? _planService;
   UpgradePromptService? _upgradePromptService;
   AdService? _adService;
-  PhotoOfTheDayService? _photoOfTheDayService;
+  PhotoAwardsService? _photoAwardsService;
   bool _servicesInitialized = false;
-  final Map<String, bool> _photoOfDayCache = {};
+  final Map<String, PhotoAwardFlags> _awardFlagsCache = {};
   final ScrollController _scrollController = ScrollController();
   bool _showStorageBanner = false;
 
@@ -70,7 +70,7 @@ class _HistoricoWidgetState extends State<HistoricoWidget> {
       _planService = PlanService(supabaseService);
       _upgradePromptService = UpgradePromptService(_planService!, supabaseService);
       _adService = AdService(supabaseService);
-      _photoOfTheDayService = PhotoOfTheDayService(supabaseService);
+      _photoAwardsService = PhotoAwardsService(supabaseService);
       
       // O SDK já é inicializado no main.dart, não precisamos inicializar novamente
       
@@ -361,20 +361,25 @@ class _HistoricoWidgetState extends State<HistoricoWidget> {
               ),
             ),
           ),
-          // Badge de troféu se for foto do dia
-          FutureBuilder<bool>(
-            future: _isPhotoOfTheDay(photo.id),
+          FutureBuilder<PhotoAwardFlags>(
+            future: _awardFlagsForPhoto(photo.id),
             builder: (context, snapshot) {
-              if (snapshot.data == true && !_model.isSelectionMode) {
-                return Positioned(
-                  top: 8,
-                  right: 8,
-                  child: PhotoTrophyBadge(
-                    size: TrophyBadgeSize.small,
-                  ),
-                );
+              final flags = snapshot.data;
+              if (flags == null ||
+                  !flags.any ||
+                  _model.isSelectionMode) {
+                return const SizedBox.shrink();
               }
-              return const SizedBox.shrink();
+              return Positioned(
+                top: 8,
+                right: 8,
+                child: PhotoAwardBadgesColumn(
+                  isDay: flags.day,
+                  isWeek: flags.week,
+                  isMonth: flags.month,
+                  size: TrophyBadgeSize.small,
+                ),
+              );
             },
           ),
           // Ícone de check quando selecionado
@@ -401,21 +406,21 @@ class _HistoricoWidgetState extends State<HistoricoWidget> {
     );
   }
 
-  Future<bool> _isPhotoOfTheDay(String photoId) async {
-    if (_photoOfDayCache.containsKey(photoId)) {
-      return _photoOfDayCache[photoId]!;
+  Future<PhotoAwardFlags> _awardFlagsForPhoto(String photoId) async {
+    if (_awardFlagsCache.containsKey(photoId)) {
+      return _awardFlagsCache[photoId]!;
     }
-
-    if (_photoOfTheDayService == null) return false;
-
+    if (_photoAwardsService == null) {
+      return const PhotoAwardFlags(day: false, week: false, month: false);
+    }
     try {
-      final isPhotoOfDay =
-          await _photoOfTheDayService!.isPhotoOfTheDayByPhotoId(photoId);
-      _photoOfDayCache[photoId] = isPhotoOfDay;
-      return isPhotoOfDay;
+      final flags =
+          await _photoAwardsService!.getAwardFlagsByPhotoId(photoId);
+      _awardFlagsCache[photoId] = flags;
+      return flags;
     } catch (e) {
-      Logger.debug('Erro ao verificar se foto é do dia: $e');
-      return false;
+      Logger.debug('Erro ao verificar premiações da foto: $e');
+      return const PhotoAwardFlags(day: false, week: false, month: false);
     }
   }
 

@@ -20,6 +20,8 @@ class PhotoModel {
   final bool? hasPaidPlan;
   /// Preenchido pela query do feed (view feed_photos); evita N queries de "foto do dia".
   final bool? isPhotoOfTheDay;
+  final bool? isPhotoOfTheWeek;
+  final bool? isPhotoOfTheMonth;
 
   PhotoModel({
     required this.id,
@@ -42,6 +44,8 @@ class PhotoModel {
     this.isLiked,
     this.hasPaidPlan,
     this.isPhotoOfTheDay,
+    this.isPhotoOfTheWeek,
+    this.isPhotoOfTheMonth,
   });
 
   factory PhotoModel.fromJson(Map<String, dynamic> json) {
@@ -89,6 +93,8 @@ class PhotoModel {
       isLiked: json['is_liked'] as bool?,
       hasPaidPlan: json['has_paid_plan'] as bool?,
       isPhotoOfTheDay: json['is_photo_of_the_day'] as bool?,
+      isPhotoOfTheWeek: json['is_photo_of_the_week'] as bool?,
+      isPhotoOfTheMonth: json['is_photo_of_the_month'] as bool?,
     );
   }
 
@@ -133,6 +139,8 @@ class PhotoModel {
     bool? isLiked,
     bool? hasPaidPlan,
     bool? isPhotoOfTheDay,
+    bool? isPhotoOfTheWeek,
+    bool? isPhotoOfTheMonth,
   }) {
     return PhotoModel(
       id: id ?? this.id,
@@ -155,6 +163,8 @@ class PhotoModel {
       isLiked: isLiked ?? this.isLiked,
       hasPaidPlan: hasPaidPlan ?? this.hasPaidPlan,
       isPhotoOfTheDay: isPhotoOfTheDay ?? this.isPhotoOfTheDay,
+      isPhotoOfTheWeek: isPhotoOfTheWeek ?? this.isPhotoOfTheWeek,
+      isPhotoOfTheMonth: isPhotoOfTheMonth ?? this.isPhotoOfTheMonth,
     );
   }
 }

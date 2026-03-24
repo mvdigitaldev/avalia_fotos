@@ -1,4 +1,6 @@
 // lib/pages/premiacoes/premiacoes_widget.dart
+import 'dart:typed_data';
+
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'package:flutter/material.dart';
@@ -11,9 +13,11 @@ import 'package:http/http.dart' as http;
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import '../../services/supabase_service.dart';
 import '../../services/photo_of_the_day_service.dart';
+import '../../services/photo_awards_service.dart';
 import '../../services/plan_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/photo_of_the_day_model.dart';
+import '../../models/photo_of_week_month_models.dart';
 import '../../utils/logger.dart';
 import '../../utils/plans_navigation_helper.dart';
 import '../../components/photo_trophy_badge.dart';
@@ -30,10 +34,12 @@ class PremiacoesWidget extends StatefulWidget {
   State<PremiacoesWidget> createState() => _PremiacoesWidgetState();
 }
 
-class _PremiacoesWidgetState extends State<PremiacoesWidget> {
+class _PremiacoesWidgetState extends State<PremiacoesWidget>
+    with SingleTickerProviderStateMixin {
   PremiacoesModel? _model;
   final scaffoldKey = GlobalKey<ScaffoldState>();
   late PhotoOfTheDayService _photoOfTheDayService;
+  PhotoAwardsService? _photoAwardsService;
   PlanService? _planService;
   AuthService? _authService;
   bool _servicesInitialized = false;
@@ -44,13 +50,35 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
   bool _isLoading = false;
   Map<DateTime, String> _calendarPhotos = {};
   DateTime _currentMonth = DateTime.now();
+  late TabController _tabController;
+  DateTime _selectedWeekDay = DateTime.now();
+  DateTime _selectedMonthFirst =
+      DateTime(DateTime.now().year, DateTime.now().month, 1);
+  PhotoOfTheWeekModel? _photoOfTheWeek;
+  PhotoOfTheMonthModel? _photoOfTheMonth;
+  bool _loadingWeek = false;
+  bool _loadingMonth = false;
 
   @override
   void initState() {
     super.initState();
-    // Apenas inicializações que não dependem de context
     _selectedDate = DateTime.now();
     _currentMonth = DateTime.now();
+    _selectedWeekDay = DateTime.now();
+    _selectedMonthFirst =
+        DateTime(DateTime.now().year, DateTime.now().month, 1);
+    _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    if (_tabController.indexIsChanging) return;
+    if (!_servicesInitialized || !_hasActivePlan) return;
+    if (_tabController.index == 1) {
+      _loadPhotoOfTheWeek();
+    } else if (_tabController.index == 2) {
+      _loadPhotoOfTheMonth();
+    }
   }
 
   @override
@@ -76,12 +104,36 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
         Logger.warning('Data inválida no deep link: $dateParam');
       }
     }
+    final tab = state.uri.queryParameters['tab'];
+    final weekParam = state.uri.queryParameters['week'];
+    final monthParam = state.uri.queryParameters['month'];
+    if (tab == 'week') {
+      _tabController.index = 1;
+      if (weekParam != null) {
+        try {
+          _selectedWeekDay = DateTime.parse(weekParam);
+        } catch (e) {
+          Logger.warning('Semana inválida no deep link: $weekParam');
+        }
+      }
+    } else if (tab == 'month') {
+      _tabController.index = 2;
+      if (monthParam != null) {
+        try {
+          final d = DateTime.parse(monthParam);
+          _selectedMonthFirst = DateTime(d.year, d.month, 1);
+        } catch (e) {
+          Logger.warning('Mês inválido no deep link: $monthParam');
+        }
+      }
+    }
   }
 
   Future<void> _initializeServices() async {
     try {
       final supabaseService = await SupabaseService.getInstance();
       _photoOfTheDayService = PhotoOfTheDayService(supabaseService);
+      _photoAwardsService = PhotoAwardsService(supabaseService);
       _planService = PlanService(supabaseService);
       _authService = AuthService(supabaseService);
       
@@ -101,6 +153,11 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
       });
       await _loadPhotoOfTheDay();
       await _loadCalendar();
+      if (_tabController.index == 1) {
+        await _loadPhotoOfTheWeek();
+      } else if (_tabController.index == 2) {
+        await _loadPhotoOfTheMonth();
+      }
     } catch (e, stackTrace) {
       Logger.error('Erro ao inicializar serviços', e, stackTrace);
       setState(() {
@@ -171,8 +228,7 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
     }
   }
 
-  Future<void> _downloadPhotoWithSelo() async {
-    final urlImagemSelo = _photoOfTheDay?.urlImagemSelo;
+  Future<void> _downloadPhotoWithSeloUrl(String? urlImagemSelo, String fileBaseName) async {
     if (urlImagemSelo == null || urlImagemSelo.trim().isEmpty) return;
     if (!mounted) return;
 
@@ -185,7 +241,7 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
       final result = await ImageGallerySaverPlus.saveImage(
         bytes,
         quality: 100,
-        name: 'foto_do_dia_${DateFormat('yyyyMMdd', 'pt_BR').format(_selectedDate)}',
+        name: fileBaseName,
       );
       if (!mounted) return;
       if (result['isSuccess'] == true) {
@@ -199,7 +255,7 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
         throw Exception(result['error'] ?? 'Erro ao salvar na galeria');
       }
     } catch (e, stackTrace) {
-      Logger.error('Erro ao baixar foto do dia', e, stackTrace);
+      Logger.error('Erro ao baixar foto com selo', e, stackTrace);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -208,6 +264,68 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _loadPhotoOfTheWeek() async {
+    if (!_servicesInitialized || _photoAwardsService == null) return;
+    setState(() => _loadingWeek = true);
+    try {
+      final w = await _photoAwardsService!.getPhotoOfTheWeek(_selectedWeekDay);
+      setState(() {
+        _photoOfTheWeek = w;
+        _loadingWeek = false;
+      });
+    } catch (e, st) {
+      Logger.error('Erro ao carregar foto da semana', e, st);
+      setState(() => _loadingWeek = false);
+    }
+  }
+
+  Future<void> _loadPhotoOfTheMonth() async {
+    if (!_servicesInitialized || _photoAwardsService == null) return;
+    setState(() => _loadingMonth = true);
+    try {
+      final m =
+          await _photoAwardsService!.getPhotoOfTheMonth(_selectedMonthFirst);
+      setState(() {
+        _photoOfTheMonth = m;
+        _loadingMonth = false;
+      });
+    } catch (e, st) {
+      Logger.error('Erro ao carregar foto do mês', e, st);
+      setState(() => _loadingMonth = false);
+    }
+  }
+
+  Future<void> _pickWeekForPremiacoes() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedWeekDay,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      locale: const Locale('pt', 'BR'),
+    );
+    if (picked != null) {
+      setState(() => _selectedWeekDay = picked);
+      await _loadPhotoOfTheWeek();
+    }
+  }
+
+  Future<void> _pickMonthForPremiacoes() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedMonthFirst,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      locale: const Locale('pt', 'BR'),
+      helpText: 'Selecione qualquer dia do mês',
+    );
+    if (picked != null) {
+      setState(() {
+        _selectedMonthFirst = DateTime(picked.year, picked.month, 1);
+      });
+      await _loadPhotoOfTheMonth();
     }
   }
 
@@ -239,6 +357,8 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
+    _tabController.dispose();
     _model?.maybeDispose();
     super.dispose();
   }
@@ -262,7 +382,7 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
             onPressed: () => context.safePop(),
           ),
           title: Text(
-            'Foto do Dia',
+            'Premiações',
             style: FlutterFlowTheme.of(context).headlineMedium.override(
                   fontFamily: 'Poppins',
                   fontWeight: FontWeight.w600,
@@ -271,6 +391,14 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
           ),
           centerTitle: true,
           elevation: 0,
+          bottom: TabBar(
+            controller: _tabController,
+            tabs: const [
+              Tab(text: 'Dia'),
+              Tab(text: 'Semana'),
+              Tab(text: 'Mês'),
+            ],
+          ),
         ),
         body: SafeArea(
           top: true,
@@ -282,67 +410,12 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
                 )
               : !_hasActivePlan
                   ? _buildNoPlanView()
-                  : Column(
+                  : TabBarView(
+                      controller: _tabController,
                       children: [
-                        // Date Picker Button
-                        Padding(
-                          padding: const EdgeInsetsDirectional.fromSTEB(16, 16, 16, 16),
-                          child: InkWell(
-                            onTap: _showCalendarDialog,
-                            child: Container(
-                              padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 16, 12),
-                              decoration: BoxDecoration(
-                                color: FlutterFlowTheme.of(context).secondaryBackground,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: FlutterFlowTheme.of(context).alternate,
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.calendar_today,
-                                        color: FlutterFlowTheme.of(context).primary,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Text(
-                                        DateFormat('dd/MM/yyyy', 'pt_BR').format(_selectedDate),
-                                        style: FlutterFlowTheme.of(context).titleMedium.override(
-                                              fontFamily: 'Poppins',
-                                              fontWeight: FontWeight.w500,
-                                              letterSpacing: 0.0,
-                                            ),
-                                      ),
-                                    ],
-                                  ),
-                                  Icon(
-                                    Icons.arrow_forward_ios,
-                                    color: FlutterFlowTheme.of(context).secondaryText,
-                                    size: 16,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // Photo of the Day Display
-                        Expanded(
-                          child: _isLoading
-                              ? Center(
-                                  child: CircularProgressIndicator(
-                                    color: FlutterFlowTheme.of(context).primary,
-                                  ),
-                                )
-                              : _photoOfTheDay == null || _photoOfTheDay!.photoData == null
-                                  ? _buildEmptyState()
-                                  : _buildPhotoOfTheDayCard(),
-                        ),
+                        _buildDayPremiacaoTab(),
+                        _buildWeekPremiacaoTab(),
+                        _buildMonthPremiacaoTab(),
                       ],
                     ),
         ),
@@ -350,6 +423,200 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
     );
   }
 
+  Widget _buildDayPremiacaoTab() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 16, 16, 16),
+          child: InkWell(
+            onTap: _showCalendarDialog,
+            child: Container(
+              padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 16, 12),
+              decoration: BoxDecoration(
+                color: FlutterFlowTheme.of(context).secondaryBackground,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: FlutterFlowTheme.of(context).alternate,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today,
+                        color: FlutterFlowTheme.of(context).primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        DateFormat('dd/MM/yyyy', 'pt_BR').format(_selectedDate),
+                        style: FlutterFlowTheme.of(context).titleMedium.override(
+                              fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 0.0,
+                            ),
+                      ),
+                    ],
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    color: FlutterFlowTheme.of(context).secondaryText,
+                    size: 16,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: _isLoading
+              ? Center(
+                  child: CircularProgressIndicator(
+                    color: FlutterFlowTheme.of(context).primary,
+                  ),
+                )
+              : _photoOfTheDay == null || _photoOfTheDay!.photoData == null
+                  ? _buildEmptyState()
+                  : _buildPhotoOfTheDayCard(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWeekPremiacaoTab() {
+    final start = PhotoAwardsService.weekStartMonday(_selectedWeekDay);
+    final end = start.add(const Duration(days: 6));
+    final label =
+        '${DateFormat('dd/MM', 'pt_BR').format(start)} – ${DateFormat('dd/MM/yyyy', 'pt_BR').format(end)}';
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 16, 16, 16),
+          child: InkWell(
+            onTap: _pickWeekForPremiacoes,
+            child: Container(
+              padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 16, 12),
+              decoration: BoxDecoration(
+                color: FlutterFlowTheme.of(context).secondaryBackground,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: FlutterFlowTheme.of(context).alternate,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_view_week,
+                        color: FlutterFlowTheme.of(context).primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        label,
+                        style: FlutterFlowTheme.of(context).titleMedium.override(
+                              fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 0.0,
+                            ),
+                      ),
+                    ],
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    color: FlutterFlowTheme.of(context).secondaryText,
+                    size: 16,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: _loadingWeek
+              ? Center(
+                  child: CircularProgressIndicator(
+                    color: FlutterFlowTheme.of(context).primary,
+                  ),
+                )
+              : _photoOfTheWeek == null || _photoOfTheWeek!.photoData == null
+                  ? _buildEmptyWeekState()
+                  : _buildPhotoOfTheWeekCard(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMonthPremiacaoTab() {
+    final label =
+        DateFormat('MMMM yyyy', 'pt_BR').format(_selectedMonthFirst);
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 16, 16, 16),
+          child: InkWell(
+            onTap: _pickMonthForPremiacoes,
+            child: Container(
+              padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 16, 12),
+              decoration: BoxDecoration(
+                color: FlutterFlowTheme.of(context).secondaryBackground,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: FlutterFlowTheme.of(context).alternate,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_month,
+                        color: FlutterFlowTheme.of(context).primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        label,
+                        style: FlutterFlowTheme.of(context).titleMedium.override(
+                              fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 0.0,
+                            ),
+                      ),
+                    ],
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    color: FlutterFlowTheme.of(context).secondaryText,
+                    size: 16,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: _loadingMonth
+              ? Center(
+                  child: CircularProgressIndicator(
+                    color: FlutterFlowTheme.of(context).primary,
+                  ),
+                )
+              : _photoOfTheMonth == null || _photoOfTheMonth!.photoData == null
+                  ? _buildEmptyMonthState()
+                  : _buildPhotoOfTheMonthCard(),
+        ),
+      ],
+    );
+  }
 
   Widget _buildEmptyState() {
     return Center(
@@ -384,9 +651,129 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
     );
   }
 
-  Widget _buildPhotoOfTheDayCard() {
-    final photoData = _photoOfTheDay!.photoData!;
+  Widget _buildEmptyWeekState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            FontAwesomeIcons.trophy,
+            size: 64,
+            color: FlutterFlowTheme.of(context).secondaryText.withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Nenhuma foto da semana selecionada',
+            style: FlutterFlowTheme.of(context).titleMedium.override(
+                  fontFamily: 'Poppins',
+                  color: FlutterFlowTheme.of(context).secondaryText,
+                  letterSpacing: 0.0,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Escolha outra semana ou aguarde a seleção do admin',
+            style: FlutterFlowTheme.of(context).bodySmall.override(
+                  fontFamily: 'Poppins',
+                  color: FlutterFlowTheme.of(context).secondaryText,
+                  letterSpacing: 0.0,
+                ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
 
+  Widget _buildEmptyMonthState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            FontAwesomeIcons.trophy,
+            size: 64,
+            color: FlutterFlowTheme.of(context).secondaryText.withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Nenhuma foto do mês selecionada',
+            style: FlutterFlowTheme.of(context).titleMedium.override(
+                  fontFamily: 'Poppins',
+                  color: FlutterFlowTheme.of(context).secondaryText,
+                  letterSpacing: 0.0,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Escolha outro mês ou aguarde a seleção do admin',
+            style: FlutterFlowTheme.of(context).bodySmall.override(
+                  fontFamily: 'Poppins',
+                  color: FlutterFlowTheme.of(context).secondaryText,
+                  letterSpacing: 0.0,
+                ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoOfTheDayCard() {
+    final pd = _photoOfTheDay?.photoData;
+    if (pd == null) return const SizedBox.shrink();
+    return _buildPremiadaCard(
+      awardTitle: 'Foto do Dia',
+      periodLabel: DateFormat('dd/MM/yyyy', 'pt_BR').format(_selectedDate),
+      photoData: pd,
+      urlImagemSelo: _photoOfTheDay?.urlImagemSelo,
+      badgeKind: TrophyAwardKind.day,
+      downloadBaseName:
+          'foto_do_dia_${DateFormat('yyyyMMdd', 'pt_BR').format(_selectedDate)}',
+    );
+  }
+
+  Widget _buildPhotoOfTheWeekCard() {
+    final pd = _photoOfTheWeek?.photoData;
+    if (pd == null) return const SizedBox.shrink();
+    final start = PhotoAwardsService.weekStartMonday(_selectedWeekDay);
+    final end = start.add(const Duration(days: 6));
+    final label =
+        '${DateFormat('dd/MM', 'pt_BR').format(start)} – ${DateFormat('dd/MM/yyyy', 'pt_BR').format(end)}';
+    return _buildPremiadaCard(
+      awardTitle: 'Foto da Semana',
+      periodLabel: label,
+      photoData: pd,
+      urlImagemSelo: _photoOfTheWeek?.urlImagemSelo,
+      badgeKind: TrophyAwardKind.week,
+      downloadBaseName:
+          'foto_semana_${DateFormat('yyyyMMdd', 'pt_BR').format(start)}',
+    );
+  }
+
+  Widget _buildPhotoOfTheMonthCard() {
+    final pd = _photoOfTheMonth?.photoData;
+    if (pd == null) return const SizedBox.shrink();
+    return _buildPremiadaCard(
+      awardTitle: 'Foto do Mês',
+      periodLabel:
+          DateFormat('MMMM yyyy', 'pt_BR').format(_selectedMonthFirst),
+      photoData: pd,
+      urlImagemSelo: _photoOfTheMonth?.urlImagemSelo,
+      badgeKind: TrophyAwardKind.month,
+      downloadBaseName:
+          'foto_mes_${_selectedMonthFirst.year}${_selectedMonthFirst.month.toString().padLeft(2, '0')}',
+    );
+  }
+
+  Widget _buildPremiadaCard({
+    required String awardTitle,
+    required String periodLabel,
+    required PhotoData photoData,
+    required String? urlImagemSelo,
+    required TrophyAwardKind badgeKind,
+    required String downloadBaseName,
+  }) {
     return SingleChildScrollView(
       padding: const EdgeInsetsDirectional.fromSTEB(16, 16, 16, 16),
       child: Column(
@@ -416,7 +803,7 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Foto do Dia',
+                  awardTitle,
                   style: GoogleFonts.poppins(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -425,7 +812,7 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  DateFormat('dd/MM/yyyy', 'pt_BR').format(_selectedDate),
+                  periodLabel,
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     color: Colors.white.withOpacity(0.9),
@@ -470,6 +857,7 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
                   right: 16,
                   child: PhotoTrophyBadge(
                     size: TrophyBadgeSize.large,
+                    kind: badgeKind,
                   ),
                 ),
               ],
@@ -479,14 +867,16 @@ class _PremiacoesWidgetState extends State<PremiacoesWidget> {
           const SizedBox(height: 24),
 
           // Botão de download (apenas se url_imagem_selo estiver preenchido)
-          if (_photoOfTheDay!.urlImagemSelo != null &&
-              _photoOfTheDay!.urlImagemSelo!.trim().isNotEmpty)
+          if (urlImagemSelo != null && urlImagemSelo.trim().isNotEmpty)
             Padding(
               padding: const EdgeInsetsDirectional.fromSTEB(0, 0, 0, 24),
               child: SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: _downloadPhotoWithSelo,
+                  onPressed: () => _downloadPhotoWithSeloUrl(
+                    urlImagemSelo,
+                    downloadBaseName,
+                  ),
                   icon: Icon(
                     FontAwesomeIcons.download,
                     size: 20,

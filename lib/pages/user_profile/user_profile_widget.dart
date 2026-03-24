@@ -11,7 +11,7 @@ import '../../services/supabase_service.dart';
 import '../../services/photo_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/ranking_service.dart';
-import '../../services/photo_of_the_day_service.dart';
+import '../../services/photo_awards_service.dart';
 import '../../utils/logger.dart';
 import '../../models/photo_model.dart';
 import '../../components/photo_trophy_badge.dart';
@@ -36,10 +36,10 @@ class _UserProfileWidgetState extends State<UserProfileWidget> {
   late PhotoService _photoService;
   late ProfileService _profileService;
   late RankingService _rankingService;
-  PhotoOfTheDayService? _photoOfTheDayService;
+  PhotoAwardsService? _photoAwardsService;
   bool _servicesInitialized = false;
   final ScrollController _scrollController = ScrollController();
-  final Map<String, bool> _photoOfDayCache = {};
+  final Map<String, PhotoAwardFlags> _awardFlagsCache = {};
 
   // Cache manager customizado para thumbnails
   static final CacheManager _photoCacheManager = CacheManager(
@@ -69,7 +69,7 @@ class _UserProfileWidgetState extends State<UserProfileWidget> {
       _photoService = PhotoService(supabaseService);
       _profileService = ProfileService(supabaseService);
       _rankingService = RankingService(supabaseService);
-      _photoOfTheDayService = PhotoOfTheDayService(supabaseService);
+      _photoAwardsService = PhotoAwardsService(supabaseService);
 
       setState(() {
         _servicesInitialized = true;
@@ -187,21 +187,21 @@ class _UserProfileWidgetState extends State<UserProfileWidget> {
     }
   }
 
-  Future<bool> _isPhotoOfTheDay(String photoId) async {
-    if (_photoOfDayCache.containsKey(photoId)) {
-      return _photoOfDayCache[photoId]!;
+  Future<PhotoAwardFlags> _awardFlagsForPhoto(String photoId) async {
+    if (_awardFlagsCache.containsKey(photoId)) {
+      return _awardFlagsCache[photoId]!;
     }
-
-    if (_photoOfTheDayService == null) return false;
-
+    if (_photoAwardsService == null) {
+      return const PhotoAwardFlags(day: false, week: false, month: false);
+    }
     try {
-      final isPhotoOfDay =
-          await _photoOfTheDayService!.isPhotoOfTheDayByPhotoId(photoId);
-      _photoOfDayCache[photoId] = isPhotoOfDay;
-      return isPhotoOfDay;
+      final flags =
+          await _photoAwardsService!.getAwardFlagsByPhotoId(photoId);
+      _awardFlagsCache[photoId] = flags;
+      return flags;
     } catch (e) {
-      Logger.debug('Erro ao verificar se foto é do dia: $e');
-      return false;
+      Logger.debug('Erro ao verificar premiações da foto: $e');
+      return const PhotoAwardFlags(day: false, week: false, month: false);
     }
   }
 
@@ -261,19 +261,23 @@ class _UserProfileWidgetState extends State<UserProfileWidget> {
             ),
           ),
           // Badge de troféu se for foto do dia
-          FutureBuilder<bool>(
-            future: _isPhotoOfTheDay(photo.id),
+          FutureBuilder<PhotoAwardFlags>(
+            future: _awardFlagsForPhoto(photo.id),
             builder: (context, snapshot) {
-              if (snapshot.data == true) {
-                return Positioned(
-                  top: 8,
-                  right: 8,
-                  child: PhotoTrophyBadge(
-                    size: TrophyBadgeSize.small,
-                  ),
-                );
+              final flags = snapshot.data;
+              if (flags == null || !flags.any) {
+                return const SizedBox.shrink();
               }
-              return const SizedBox.shrink();
+              return Positioned(
+                top: 8,
+                right: 8,
+                child: PhotoAwardBadgesColumn(
+                  isDay: flags.day,
+                  isWeek: flags.week,
+                  isMonth: flags.month,
+                  size: TrophyBadgeSize.small,
+                ),
+              );
             },
           ),
         ],

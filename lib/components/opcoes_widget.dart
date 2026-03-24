@@ -647,6 +647,102 @@ class _OpcoesWidgetState extends State<OpcoesWidget> {
                   ),
                 ),
               ),
+            if (_isAdmin)
+              Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 8.0),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    context.push('/admin/select-photo-of-week');
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Color(0x11868686),
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 8.0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.max,
+                        children: [
+                          _buildOptionIcon(
+                            Icon(
+                              Icons.view_week_outlined,
+                              color: FlutterFlowTheme.of(context).primary,
+                              size: 24.0,
+                            ),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 0.0, 0.0),
+                              child: Text(
+                                'Selecionar Foto da Semana',
+                                style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                      font: GoogleFonts.poppins(),
+                                      letterSpacing: 0.0,
+                                    ),
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.arrow_right_sharp,
+                            color: FlutterFlowTheme.of(context).primary,
+                            size: 24.0,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            if (_isAdmin)
+              Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 8.0),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    context.push('/admin/select-photo-of-month');
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Color(0x11868686),
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 8.0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.max,
+                        children: [
+                          _buildOptionIcon(
+                            Icon(
+                              Icons.calendar_month_outlined,
+                              color: FlutterFlowTheme.of(context).primary,
+                              size: 24.0,
+                            ),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 0.0, 0.0),
+                              child: Text(
+                                'Selecionar Foto do Mês',
+                                style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                      font: GoogleFonts.poppins(),
+                                      letterSpacing: 0.0,
+                                    ),
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.arrow_right_sharp,
+                            color: FlutterFlowTheme.of(context).primary,
+                            size: 24.0,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             // Item Enviar Notificação (apenas para admins)
             if (_isAdmin)
               Padding(

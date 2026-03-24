@@ -5,14 +5,18 @@ import '/flutter_flow/flutter_flow_theme.dart';
 
 enum TrophyBadgeSize { small, medium, large }
 
+enum TrophyAwardKind { day, week, month }
+
 class PhotoTrophyBadge extends StatelessWidget {
   final TrophyBadgeSize size;
+  final TrophyAwardKind kind;
   final bool showLabel;
   final Alignment alignment;
 
   const PhotoTrophyBadge({
     super.key,
     this.size = TrophyBadgeSize.medium,
+    this.kind = TrophyAwardKind.day,
     this.showLabel = false,
     this.alignment = Alignment.topRight,
   });
@@ -27,6 +31,28 @@ class PhotoTrophyBadge extends StatelessWidget {
     }
   }
 
+  String get _assetPath {
+    switch (kind) {
+      case TrophyAwardKind.day:
+        return 'assets/images/selo-dia.png';
+      case TrophyAwardKind.week:
+        return 'assets/images/selo-semana.png';
+      case TrophyAwardKind.month:
+        return 'assets/images/selo-mes.png';
+    }
+  }
+
+  String get _label {
+    switch (kind) {
+      case TrophyAwardKind.day:
+        return 'Foto do Dia';
+      case TrophyAwardKind.week:
+        return 'Foto da Semana';
+      case TrophyAwardKind.month:
+        return 'Foto do Mês';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Align(
@@ -35,7 +61,7 @@ class PhotoTrophyBadge extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           Image.asset(
-            'assets/images/selo-dia.png',
+            _assetPath,
             width: _sealSize,
             height: _sealSize,
             fit: BoxFit.contain,
@@ -55,7 +81,7 @@ class PhotoTrophyBadge extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  'Foto do Dia',
+                  _label,
                   style: GoogleFonts.poppins(
                     fontSize: _sealSize * 0.12,
                     fontWeight: FontWeight.w600,
@@ -67,6 +93,52 @@ class PhotoTrophyBadge extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Selos empilhados (canto do card) — dia, semana e mês.
+class PhotoAwardBadgesColumn extends StatelessWidget {
+  const PhotoAwardBadgesColumn({
+    super.key,
+    required this.isDay,
+    required this.isWeek,
+    required this.isMonth,
+    this.size = TrophyBadgeSize.medium,
+  });
+
+  final bool isDay;
+  final bool isWeek;
+  final bool isMonth;
+  final TrophyBadgeSize size;
+
+  double get _spacing {
+    switch (size) {
+      case TrophyBadgeSize.small:
+        return 4;
+      case TrophyBadgeSize.medium:
+        return 6;
+      case TrophyBadgeSize.large:
+        return 8;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (isDay) ...[
+          PhotoTrophyBadge(size: size, kind: TrophyAwardKind.day),
+          if (isWeek || isMonth) SizedBox(height: _spacing),
+        ],
+        if (isWeek) ...[
+          PhotoTrophyBadge(size: size, kind: TrophyAwardKind.week),
+          if (isMonth) SizedBox(height: _spacing),
+        ],
+        if (isMonth) PhotoTrophyBadge(size: size, kind: TrophyAwardKind.month),
+      ],
     );
   }
 }

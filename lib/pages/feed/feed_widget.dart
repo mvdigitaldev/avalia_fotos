@@ -761,11 +761,16 @@ class _FeedWidgetState extends State<FeedWidget> {
       },
         ),
         // Badge de troféu se for foto do dia (vem na query do feed via view feed_photos)
-        if (photo.isPhotoOfTheDay == true)
+        if (photo.isPhotoOfTheDay == true ||
+            photo.isPhotoOfTheWeek == true ||
+            photo.isPhotoOfTheMonth == true)
           Positioned(
             top: 12,
             right: 12,
-            child: PhotoTrophyBadge(
+            child: PhotoAwardBadgesColumn(
+              isDay: photo.isPhotoOfTheDay == true,
+              isWeek: photo.isPhotoOfTheWeek == true,
+              isMonth: photo.isPhotoOfTheMonth == true,
               size: TrophyBadgeSize.medium,
             ),
           ),

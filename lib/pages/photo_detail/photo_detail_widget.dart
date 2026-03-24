@@ -16,7 +16,7 @@ import '../../utils/logger.dart';
 import '../../models/comment_model.dart';
 import '../../components/share_bottom_sheet.dart';
 import '../../components/photo_trophy_badge.dart';
-import '../../services/photo_of_the_day_service.dart';
+import '../../services/photo_awards_service.dart';
 import 'photo_detail_model.dart';
 export 'photo_detail_model.dart';
 
@@ -36,10 +36,11 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
   final scaffoldKey = GlobalKey<ScaffoldState>();
   late PhotoService _photoService;
   late AuthService _authService;
-  PhotoOfTheDayService? _photoOfTheDayService;
+  PhotoAwardsService? _photoAwardsService;
   bool _servicesInitialized = false;
   final ScrollController _scrollController = ScrollController();
-  bool? _isPhotoOfDay;
+  PhotoAwardFlags _awardFlags =
+      const PhotoAwardFlags(day: false, week: false, month: false);
 
   // Cache manager customizado para fotos
   static final CacheManager _photoCacheManager = CacheManager(
@@ -62,7 +63,7 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
       final supabaseService = await SupabaseService.getInstance();
       _photoService = PhotoService(supabaseService);
       _authService = AuthService(supabaseService);
-      _photoOfTheDayService = PhotoOfTheDayService(supabaseService);
+      _photoAwardsService = PhotoAwardsService(supabaseService);
       setState(() {
         _servicesInitialized = true;
       });
@@ -114,12 +115,11 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
 
       final commentModels = comments.map((c) => CommentModel.fromJson(c)).toList();
 
-      // Verificar se é foto do dia (backend usa data de negócio)
-      if (_photoOfTheDayService != null) {
-        final isPhotoOfDay =
-            await _photoOfTheDayService!.isPhotoOfTheDayByPhotoId(photo.id);
+      if (_photoAwardsService != null) {
+        final flags =
+            await _photoAwardsService!.getAwardFlagsByPhotoId(photo.id);
         setState(() {
-          _isPhotoOfDay = isPhotoOfDay;
+          _awardFlags = flags;
         });
       }
 
@@ -542,13 +542,15 @@ class _PhotoDetailWidgetState extends State<PhotoDetailWidget> {
                     ),
                   ),
                 ),
-                // Badge de troféu se for foto do dia
-                if (_isPhotoOfDay == true)
+                if (_awardFlags.any)
                   Positioned(
                     top: 16,
                     right: 16,
-                    child: PhotoTrophyBadge(
-                      size: TrophyBadgeSize.large,
+                    child: PhotoAwardBadgesColumn(
+                      isDay: _awardFlags.day,
+                      isWeek: _awardFlags.week,
+                      isMonth: _awardFlags.month,
+                      size: TrophyBadgeSize.medium,
                     ),
                   ),
               ],

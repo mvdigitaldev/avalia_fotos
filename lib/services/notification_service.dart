@@ -507,6 +507,42 @@ class NotificationService {
             }
           });
         }
+      } else if (type == 'photo_of_the_week') {
+        final deepLink = data['deep_link'] as String?;
+        final week = data['week_start'] as String?;
+        final linkToNavigate = deepLink ??
+            (week != null ? '/premiacoes?tab=week&week=$week' : null);
+        if (linkToNavigate != null) {
+          Logger.info('Deep link foto da semana: $linkToNavigate');
+          Future.delayed(const Duration(milliseconds: 500), () {
+            try {
+              final context = appNavigatorKey.currentContext;
+              if (context != null) {
+                GoRouter.of(context).push(linkToNavigate);
+              }
+            } catch (e) {
+              Logger.warning('Erro ao navegar para deep link: $e');
+            }
+          });
+        }
+      } else if (type == 'photo_of_the_month') {
+        final deepLink = data['deep_link'] as String?;
+        final month = data['month_start'] as String?;
+        final linkToNavigate = deepLink ??
+            (month != null ? '/premiacoes?tab=month&month=$month' : null);
+        if (linkToNavigate != null) {
+          Logger.info('Deep link foto do mês: $linkToNavigate');
+          Future.delayed(const Duration(milliseconds: 500), () {
+            try {
+              final context = appNavigatorKey.currentContext;
+              if (context != null) {
+                GoRouter.of(context).push(linkToNavigate);
+              }
+            } catch (e) {
+              Logger.warning('Erro ao navegar para deep link: $e');
+            }
+          });
+        }
       } else if (type == 'upgrade_plan') {
         final deepLink = data['deep_link'] as String?;
         

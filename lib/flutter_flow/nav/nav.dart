@@ -48,6 +48,8 @@ import '/pages/reports/reports_widget.dart';
 import '/pages/premiacoes/premiacoes_widget.dart';
 // Import SelectPhotoOfDayWidget explicitly
 import '/pages/admin/select_photo_of_day_widget.dart';
+import '/pages/admin/select_photo_of_week_widget.dart';
+import '/pages/admin/select_photo_of_month_widget.dart';
 // Import SendPushNotificationWidget explicitly
 import '/pages/admin/send_push_notification_widget.dart';
 // Import AdminManageUsersWidget explicitly
@@ -324,6 +326,18 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) {
         path: SelectPhotoOfDayWidget.routePath,
         requireAuth: true,
         builder: (context, params) => SelectPhotoOfDayWidget(),
+      ),
+      FFRoute(
+        name: SelectPhotoOfWeekWidget.routeName,
+        path: SelectPhotoOfWeekWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => SelectPhotoOfWeekWidget(),
+      ),
+      FFRoute(
+        name: SelectPhotoOfMonthWidget.routeName,
+        path: SelectPhotoOfMonthWidget.routePath,
+        requireAuth: true,
+        builder: (context, params) => SelectPhotoOfMonthWidget(),
       ),
       FFRoute(
         name: SendPushNotificationWidget.routeName,
